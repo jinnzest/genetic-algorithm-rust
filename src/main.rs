@@ -20,21 +20,20 @@ pub mod zygote;
 use fitness_calculator::*;
 use global_constants::*;
 use random_utils::*;
-use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::breeding::make_breeding;
+use crate::breeding::BreedingStruct;
 use crate::incubator::Incubator;
 use crate::utils::decode_bits_to_u64s;
 
 impl RandomParams for RandomParamsStruct {
-    fn chromosome_genes_amount(&self) -> usize {
+    fn chromosome_genes_amount() -> usize {
         20 * U64_BITS_AMOUNT
     }
 }
 
 impl FitnessCalculator for FitnessCalculatorStruct {
-    fn calc_fitness(&self, decoded_genotype: &[u64]) -> f64 {
+    fn calc_fitness(decoded_genotype: &[u64]) -> f64 {
         let u64s = decode_bits_to_u64s(decoded_genotype);
         let bits = u64s.iter().fold(0u64, |acc, v| acc | v);
         if bits == 0 { 0f64 } else { 1f64 }
@@ -44,18 +43,13 @@ impl FitnessCalculator for FitnessCalculatorStruct {
 fn main() {
     println!("starting...");
     let chromosomes_amount = 1000;
-    let random_params = Rc::new(RandomParamsStruct);
-    let random_utils: Rc<dyn RandomUtils> = random_utils::make_random_utils(random_params);
-    let fitness_calculaltor: Rc<dyn FitnessCalculator> = Rc::new(FitnessCalculatorStruct);
-    let perf_choosing_probability: Rc<dyn ChoosingProbability> = Rc::new(PerfChoosingProbability);
 
-    let mut incubator = Incubator::new(
-        chromosomes_amount,
-        make_breeding(random_utils.clone()).clone(),
-        fitness_calculaltor.clone(),
-        perf_choosing_probability.clone(),
-    );
-
+    let mut incubator: Incubator<
+        RandomUtilsStruct<RandomParamsStruct>,
+        PerfChoosingProbability,
+        BreedingStruct<RandomUtilsStruct<RandomParamsStruct>>,
+        FitnessCalculatorStruct,
+    > = Incubator::new(chromosomes_amount);
     let duration = run_and_measure(|| {
         for _ in 0..100_000 {
             incubator.make_next_generation();
