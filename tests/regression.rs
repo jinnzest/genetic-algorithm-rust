@@ -4,12 +4,11 @@ use genetic_algorithm::gen::Gen;
 use genetic_algorithm::zygote::Zygote;
 use genetic_algorithm::random_utils::{RandomUtils, ChoosingProbability};
 use genetic_algorithm::fitness_calculator::FitnessCalculator;
+use genetic_algorithm::breeding::BreedingStruct;
 use genetic_algorithm::chromosome::Chromosome;
 use std::str::FromStr;
+use genetic_algorithm::incubator::Incubator;
 use genetic_algorithm::global_constants::*;
-use genetic_algorithm::incubator;
-use genetic_algorithm::breeding;
-use std::rc::Rc;
 
 const CHROMOSOMES_AMOUNT: usize = 5;
 static mut MUTATED_CHROMOSOMES: usize = 0;
@@ -50,17 +49,18 @@ fn breeding_new_generation_should_replace_all_genes_by_defined_ones_during_a_few
 
 pub struct RandomUtilsMock;
 
+
 pub struct ChoosingProbabilityMock;
 
 impl ChoosingProbability for ChoosingProbabilityMock {
-    fn select_individual_probability(&self, fitness: f64) -> bool {
+    fn select_individual_probability(fitness: f64) -> bool {
         fitness >= 0.5f64
     }
 }
 
 
 impl RandomUtils for RandomUtilsMock {
-    fn mutation_pos(&self) -> usize {
+    fn mutation_pos() -> usize {
         unsafe {
             if MUTATED_CHROMOSOMES == CHROMOSOMES_AMOUNT {
                 MUTATED_CHROMOSOMES = 0;
@@ -76,27 +76,27 @@ impl RandomUtils for RandomUtilsMock {
         }
     }
 
-    fn crossing_chromosome_pos(&self) -> usize {
+    fn crossing_chromosome_pos() -> usize {
         CHROMOSOME_GENES_AMOUNT / 2
     }
 
-    fn crossing_zygote_pos(&self) -> usize {
+    fn crossing_zygote_pos() -> usize {
         unimplemented!()
     }
 
-    fn should_cross_zygotes(&self) -> bool {
+    fn should_cross_zygotes() -> bool {
         false
     }
 
-    fn should_mutate(&self) -> bool {
+    fn should_mutate() -> bool {
         true
     }
 
-    fn rand_gen(&self) -> Gen {
+    fn rand_gen() -> Gen {
         unsafe { GEN_TO.clone() }
     }
 
-    fn generate_zygote(&self) -> Zygote {
+    fn generate_zygote() -> Zygote {
         unsafe {
             let s = (0..CHROMOSOME_GENES_AMOUNT)
                 .map(|_| GEN_FROM.to_char())
@@ -106,10 +106,10 @@ impl RandomUtils for RandomUtilsMock {
     }
 }
 
-pub struct FitnessCalculatorMock;
+pub struct FitnessCalculatorStruct;
 
-impl FitnessCalculator for FitnessCalculatorMock {
-    fn calc_fitness(&self, decoded_genotype: &[bool]) -> f64 {
+impl FitnessCalculator for FitnessCalculatorStruct {
+    fn calc_fitness(decoded_genotype: &[bool]) -> f64 {
         let sum = decoded_genotype.iter().fold(0.0, |acc, &b| {
             acc + (if b { 1.0 } else { 0.0 })
         });
@@ -128,17 +128,12 @@ fn all_chromosomes_are_degenerated(chromosomes: &[Chromosome]) -> bool {
 }
 
 fn run_generations() -> usize {
-    let random_utils: Rc<RandomUtils> = Rc::new(RandomUtilsMock);
-    let fitness_calculator: Rc<FitnessCalculator> = Rc::new(FitnessCalculatorMock);
-    let rc: Rc<ChoosingProbability> = Rc::new(ChoosingProbabilityMock);
-
-    let mut incubator = incubator::make_incubator(
-        CHROMOSOMES_AMOUNT,
-        &breeding::make_breeding(Rc::clone(&random_utils)),
-        &fitness_calculator,
-        &random_utils,
-        &rc,
-    );
+    let mut incubator: Incubator<
+        RandomUtilsMock,
+        ChoosingProbabilityMock,
+        BreedingStruct<RandomUtilsMock>,
+        FitnessCalculatorStruct,
+    > = Incubator::new(CHROMOSOMES_AMOUNT);
 
     let mut gen_count: usize = 0;
     while !all_chromosomes_are_degenerated(&incubator.get_chromosomes()) {

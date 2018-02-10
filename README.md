@@ -11,3 +11,4 @@ To try it yourself run: cargo build --release && target/release/genetic-algorith
 Optimization steps and measurements: 
 
 1. Without optimization it runs 100000 generations for about 14368590 ms
+2. Dynamic dispatching is replaced by static one: 14304906 ms, mostly the same speed

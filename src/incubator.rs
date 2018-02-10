@@ -3,41 +3,32 @@ use individual::Individual;
 use breeding::Breeding;
 use random_utils::{RandomUtils, ChoosingProbability};
 use fitness_calculator::FitnessCalculator;
+use std::marker::PhantomData;
 use generation;
 use chromosome::Chromosome;
 use generation::Parents;
-use std::rc::Rc;
 
-pub struct Incubator {
-    generation: Rc<Generation>,
-    breeding: Rc<Breeding>,
-    fitness_calculator: Rc<FitnessCalculator>,
-    random_utils: Rc<RandomUtils>,
-    choosing_probability: Rc<ChoosingProbability>,
+pub struct Incubator<RU: RandomUtils, CP: ChoosingProbability, B: Breeding<RU>, FC: FitnessCalculator> {
+    generation: Generation<CP>,
+    _phantom_b: PhantomData<B>,
+    _phantom_fc: PhantomData<FC>,
+    _phantom_ru: PhantomData<RU>,
 }
 
-pub fn make_incubator(
-    chromosomes_amount: usize,
-    breeding: &Rc<Breeding>,
-    fitness_calculator: &Rc<FitnessCalculator>,
-    random_utils: &Rc<RandomUtils>,
-    choosing_probability: &Rc<ChoosingProbability>,
-) -> Incubator {
-    let individuals = (0..chromosomes_amount)
-        .map(|_| {
-            Incubator::generate_individual(breeding, fitness_calculator)
-        })
-        .collect::<Vec<Individual>>();
-    Incubator {
-        generation: generation::make_generation(individuals, choosing_probability),
-        breeding: Rc::clone(breeding),
-        fitness_calculator: Rc::clone(fitness_calculator),
-        random_utils: Rc::clone(random_utils),
-        choosing_probability: Rc::clone(choosing_probability),
+impl<RU: RandomUtils, CP: ChoosingProbability, B: Breeding<RU>, FC: FitnessCalculator>
+    Incubator<RU, CP, B, FC> {
+    pub fn new(chromosomes_amount: usize) -> Self {
+        let individuals = (0..chromosomes_amount)
+            .map(|_| Incubator::<RU, CP, B, FC>::generate_individual())
+            .collect::<Vec<Individual>>();
+        Self {
+            generation: Generation::new(individuals),
+            _phantom_b: PhantomData,
+            _phantom_fc: PhantomData,
+            _phantom_ru: PhantomData,
+        }
     }
-}
 
-impl Incubator {
     pub fn get_best_individual(&self) -> Individual {
         generation::find_best_individual(&self.generation.individuals)
     }
@@ -57,14 +48,9 @@ impl Incubator {
                  ref first,
                  ref second,
              }| {
-                let new_chromosome = self.breeding.conception(
-                    &first.chromosome,
-                    &second.chromosome,
-                );
+                let new_chromosome = B::conception(&first.chromosome, &second.chromosome);
                 Individual {
-                    fitness: self.fitness_calculator.calc_fitness(
-                        &new_chromosome.decode_genotype(),
-                    ),
+                    fitness: FC::calc_fitness(&new_chromosome.decode_genotype()),
                     chromosome: new_chromosome,
                 }
             })
@@ -72,17 +58,13 @@ impl Incubator {
     }
 
     pub fn make_next_generation(&mut self) {
-        self.generation =
-            generation::make_generation(self.create_individuals(), &self.choosing_probability);
+        self.generation = Generation::new(self.create_individuals());
     }
 
-    fn generate_individual(
-        breeding: &Rc<Breeding>,
-        fitness_calculator: &Rc<FitnessCalculator>,
-    ) -> Individual {
-        let chromosome = breeding.generate_chromosome();
+    fn generate_individual() -> Individual {
+        let chromosome = B::generate_chromosome();
         Individual {
-            fitness: fitness_calculator.calc_fitness(&chromosome.decode_genotype()),
+            fitness: FC::calc_fitness(&chromosome.decode_genotype()),
             chromosome,
         }
     }
