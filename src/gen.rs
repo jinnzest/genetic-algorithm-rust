@@ -48,10 +48,11 @@ pub struct VecGen {
 
 impl fmt::Display for VecGen {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s = &self.genes.iter().fold(String::new(), |acc, g| {
-            format!("{}{}", g, acc)
-        });
-        write!(f, "{}", s)
+        let mut string = String::new();
+        for g in &self.genes {
+            string = format!("{}{}", g, string);
+        }
+        write!(f, "{}", string)
     }
 }
 
@@ -109,5 +110,11 @@ mod to_and_from_str {
         assert_eq!(Gen::from_str("d").unwrap(), Gen::D0);
         assert_eq!(Gen::from_str("R").unwrap(), Gen::R1);
         assert_eq!(Gen::from_str("r").unwrap(), Gen::R0);
+    }
+
+    #[test]
+    fn vec_gens() {
+        let vec = VecGen { genes: vec![Gen::R0, Gen::R1, Gen::D0, Gen::D1] };
+        assert_eq!(format!("{}", vec), "DdRr");
     }
 }

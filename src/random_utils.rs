@@ -3,6 +3,7 @@ use zygote::Zygote;
 use rand;
 use conv::ValueFrom;
 use std::marker::PhantomData;
+use u64s::U64s;
 
 pub trait RandomUtils {
     fn mutation_pos() -> usize;
@@ -63,10 +64,12 @@ where
     }
 
     fn generate_zygote() -> Zygote {
-        let genes: Vec<Gen> = (0..R::chromosome_genes_amount())
-            .map(|_| rand::random::<Gen>())
-            .collect();
-        Zygote::new(genes)
+        let len = R::chromosome_genes_amount() / 64;
+        let d = (0..len).map(|_| rand::random::<u64>()).collect();
+        let v = (0..len).map(|_| rand::random::<u64>()).collect();
+        let dominance = U64s::new(d);
+        let values = U64s::new(v);
+        Zygote::new(dominance, values)
     }
 }
 

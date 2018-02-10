@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 #![cfg_attr(test, feature(plugin))]
 #![cfg_attr(test, plugin(quickcheck_macros))]
 
@@ -13,8 +14,8 @@ extern crate lazy_static;
 extern crate conv;
 
 pub mod utils;
-pub mod global_constants;
 pub mod gen;
+pub mod u64s;
 pub mod random_utils;
 pub mod zygote;
 pub mod chromosome;
@@ -23,6 +24,7 @@ pub mod generation;
 pub mod fitness_calculator;
 pub mod breeding;
 pub mod incubator;
+pub mod global_constants;
 
 use breeding::*;
 use incubator::Incubator;
@@ -40,8 +42,8 @@ impl RandomParams for RandomParamsStruct {
 }
 
 impl FitnessCalculator for FitnessCalculatorStruct {
-    fn calc_fitness(decoded_genotype: &[bool]) -> f64 {
-        let u64s = decode_bools_to_u64s(decoded_genotype);
+    fn calc_fitness(decoded_genotype: &[u64]) -> f64 {
+        let u64s = decode_bits_to_u64s(decoded_genotype);
         u64s.iter().map(|l| f64::approx_from(*l)).fold(
             0.0,
             |acc, d| {

@@ -7,6 +7,7 @@ extern crate quickcheck;
 extern crate rand;
 #[macro_use]
 extern crate rand_derive;
+#[macro_use]
 extern crate comp;
 #[macro_use]
 extern crate lazy_static;
@@ -15,6 +16,7 @@ extern crate conv;
 pub mod global_constants;
 pub mod utils;
 pub mod gen;
+pub mod u64s;
 pub mod zygote;
 pub mod random_utils;
 pub mod chromosome;

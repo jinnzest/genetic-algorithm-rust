@@ -5,7 +5,7 @@ use chromosome::Chromosome;
 pub trait Breeding<RU: RandomUtils> {
     fn generate_chromosome() -> Chromosome;
     fn conception(first_parent: &Chromosome, second_parent: &Chromosome) -> Chromosome;
-    fn attempt_cross_zygotes(chr: Chromosome) -> Chromosome;
+    fn attempt_cross_zygotes(chr: &Chromosome) -> Chromosome;
     fn attempt_mutate(chr: Chromosome) -> Chromosome;
 }
 
@@ -19,18 +19,22 @@ impl<RU: RandomUtils> Breeding<RU> for BreedingStruct<RU> {
     }
 
     fn conception(first_parent: &Chromosome, second_parent: &Chromosome) -> Chromosome {
-        Self::attempt_cross_zygotes(Self::attempt_mutate(first_parent.cross_chromosomes(
-            second_parent,
+        let new_chr = first_parent.clone();
+        Self::attempt_cross_zygotes(&Self::attempt_mutate(new_chr.cross_chromosomes(
+            &second_parent.clone(),
             RU::crossing_chromosome_pos(),
             RU::crossing_chromosome_pos(),
         )))
     }
 
-    fn attempt_cross_zygotes(chr: Chromosome) -> Chromosome {
+    fn attempt_cross_zygotes(chr: &Chromosome) -> Chromosome {
         if RU::should_cross_zygotes() {
-            chr.cross_zygotes(RU::crossing_zygote_pos(), RU::crossing_zygote_pos() + 1)
+            chr.clone().cross_zygotes(
+                RU::crossing_zygote_pos(),
+                RU::crossing_zygote_pos() + 1,
+            )
         } else {
-            chr
+            chr.clone()
         }
     }
 

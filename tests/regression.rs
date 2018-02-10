@@ -1,4 +1,5 @@
 extern crate genetic_algorithm;
+extern crate conv;
 
 use genetic_algorithm::gen::Gen;
 use genetic_algorithm::zygote::Zygote;
@@ -9,6 +10,7 @@ use genetic_algorithm::chromosome::Chromosome;
 use std::str::FromStr;
 use genetic_algorithm::incubator::Incubator;
 use genetic_algorithm::global_constants::*;
+use conv::ApproxFrom;
 
 const CHROMOSOMES_AMOUNT: usize = 5;
 static mut MUTATED_CHROMOSOMES: usize = 0;
@@ -109,10 +111,11 @@ impl RandomUtils for RandomUtilsMock {
 pub struct FitnessCalculatorStruct;
 
 impl FitnessCalculator for FitnessCalculatorStruct {
-    fn calc_fitness(decoded_genotype: &[bool]) -> f64 {
-        let sum = decoded_genotype.iter().fold(0.0, |acc, &b| {
-            acc + (if b { 1.0 } else { 0.0 })
-        });
+    fn calc_fitness(decoded_genotype: &[u64]) -> f64 {
+        let sum = decoded_genotype.iter().map(|l| f64::approx_from(*l)).fold(
+            0.0,
+            |acc, d| acc + d.unwrap(),
+        );
         unsafe { sum * SIGN }
     }
 }

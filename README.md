@@ -14,3 +14,4 @@ Optimization steps and measurements:
 2. Dynamic dispatching is replaced by static one: 14304906 ms, mostly the same speed
 3. Hash map is replaced by function with pattern matching: 11891678 ms, ~ 20% faster than initial one
 4. Instead of parent pairs their position pairs are returned thus reducing cloning: 10931510 ms, ~ 30% faster than initial one
+5. Vec of genes is replaced by vec of u64s: 92167 ms, ~ 155 times faster than initial one

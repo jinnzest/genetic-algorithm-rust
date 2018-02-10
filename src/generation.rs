@@ -45,7 +45,7 @@ impl<CP: ChoosingProbability> Generation<CP> {
             }
             parents.push(Parents {
                 first_pos,
-                second_pos
+                second_pos,
             });
             pos += 1;
         }

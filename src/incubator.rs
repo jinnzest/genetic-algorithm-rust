@@ -45,7 +45,10 @@ impl<RU: RandomUtils, CP: ChoosingProbability, B: Breeding<RU>, FC: FitnessCalcu
         self.generation
             .select_parent_pairs()
             .iter()
-            .map(|&Parents { first_pos, second_pos }| {
+            .map(|&Parents {
+                 first_pos,
+                 second_pos,
+             }| {
                 let first = &individuals[first_pos].chromosome;
                 let second = &individuals[second_pos].chromosome;
                 let new_chromosome = B::conception(first, second);
