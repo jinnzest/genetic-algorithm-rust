@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::marker::PhantomData;
 
 use crate::{individual::Individual, random_utils::ChoosingProbability, utils::normalize_fitness};
 
@@ -8,27 +8,25 @@ pub struct Parents {
     pub second: Individual,
 }
 
-pub struct Generation {
+pub struct Generation<CP: ChoosingProbability> {
     pub individuals: Vec<Individual>,
     pub min_fitness: f64,
     pub max_fitness: f64,
-    choosing_probability: Rc<dyn ChoosingProbability>,
+    phantom: PhantomData<CP>,
 }
 
-impl Generation {
-    pub fn new(
-        individuals: Vec<Individual>,
-        choosing_probability: Rc<dyn ChoosingProbability>,
-    ) -> Generation {
+impl<CP: ChoosingProbability> Generation<CP> {
+    pub fn new(individuals: Vec<Individual>) -> Self {
         let min_fitness = find_worst_fitness(&individuals);
         let max_fitness = find_best_fitness(&individuals);
-        Generation {
+        Self {
             min_fitness,
             max_fitness,
             individuals,
-            choosing_probability: choosing_probability.clone(),
+            phantom: PhantomData,
         }
     }
+
     pub fn select_parent_pairs(&self) -> Vec<Parents> {
         let mut parents = Vec::new();
         let mut pos = 0;
@@ -46,14 +44,11 @@ impl Generation {
     fn find_parent_pos(&self, pos: &mut usize, skip_pos: Option<usize>) -> usize {
         loop {
             let candidate = &self.individuals[*pos];
-            if self
-                .choosing_probability
-                .select_individual_with_probability(normalize_fitness(
-                    candidate.fitness,
-                    self.min_fitness,
-                    self.max_fitness,
-                ))
-            {
+            if CP::select_individual_with_probability(normalize_fitness(
+                candidate.fitness,
+                self.min_fitness,
+                self.max_fitness,
+            )) {
                 return *pos;
             }
             if Some(*pos) == skip_pos {

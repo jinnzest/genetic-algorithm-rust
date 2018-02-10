@@ -1,67 +1,67 @@
-use std::rc::Rc;
-
 use rand;
+use std::marker::PhantomData;
 
 use crate::{gene::Gene, u64s::U64s, zygote::Zygote};
 
 pub trait RandomUtils {
-    fn mutation_pos(&self) -> usize;
+    fn mutation_pos() -> usize;
 
-    fn crossing_chromosome_pos(&self) -> usize;
+    fn crossing_chromosome_pos() -> usize;
 
-    fn crossing_zygote_pos(&self) -> usize;
+    fn crossing_zygote_pos() -> usize;
 
-    fn should_cross_zygotes(&self) -> bool;
+    fn should_cross_zygotes() -> bool;
 
-    fn should_mutate(&self) -> bool;
+    fn should_mutate() -> bool;
 
-    fn rand_gen(&self) -> Gene;
+    fn rand_gen() -> Gene;
 
-    fn generate_zygote(&self) -> Zygote;
+    fn generate_zygote() -> Zygote;
 }
 
-pub struct RandomUtilsStruct {
-    random_params: Rc<dyn RandomParams>,
+pub struct RandomUtilsStruct<R>
+where
+    R: RandomParams,
+{
+    _p: PhantomData<R>,
 }
 
 pub struct RandomParamsStruct;
 
 pub trait RandomParams {
-    fn chromosome_genes_amount(&self) -> usize;
+    fn chromosome_genes_amount() -> usize;
 }
 
-pub fn make_random_utils(random_params: Rc<dyn RandomParams>) -> Rc<dyn RandomUtils> {
-    Rc::new(RandomUtilsStruct { random_params })
-}
-
-impl RandomUtils for RandomUtilsStruct {
-    fn mutation_pos(&self) -> usize {
-        rand::random_range(0..usize::MAX) % self.random_params.chromosome_genes_amount()
+impl<R> RandomUtils for RandomUtilsStruct<R>
+where
+    R: RandomParams,
+{
+    fn mutation_pos() -> usize {
+        rand::random_range(0..usize::MAX) % R::chromosome_genes_amount()
     }
 
-    fn crossing_chromosome_pos(&self) -> usize {
-        rand::random_range(0..usize::MAX) % self.random_params.chromosome_genes_amount()
+    fn crossing_chromosome_pos() -> usize {
+        rand::random_range(0..usize::MAX) % R::chromosome_genes_amount()
     }
 
-    fn crossing_zygote_pos(&self) -> usize {
-        rand::random_range(0..usize::MAX) % self.random_params.chromosome_genes_amount()
+    fn crossing_zygote_pos() -> usize {
+        rand::random_range(0..usize::MAX) % R::chromosome_genes_amount()
     }
 
-    fn should_cross_zygotes(&self) -> bool {
-        rand::random::<f64>()
-            < self.random_params.chromosome_genes_amount() as f64 * 2f64 / 1_000_000.0
+    fn should_cross_zygotes() -> bool {
+        rand::random::<f64>() < R::chromosome_genes_amount() as f64 * 2f64 / 1_000_000.0
     }
 
-    fn should_mutate(&self) -> bool {
-        rand::random::<f64>() < self.random_params.chromosome_genes_amount() as f64 / 10_000.0f64
+    fn should_mutate() -> bool {
+        rand::random::<f64>() < R::chromosome_genes_amount() as f64 / 10_000.0f64
     }
 
-    fn rand_gen(&self) -> Gene {
+    fn rand_gen() -> Gene {
         rand::random::<Gene>()
     }
 
-    fn generate_zygote(&self) -> Zygote {
-        let len = self.random_params.chromosome_genes_amount() / 64;
+    fn generate_zygote() -> Zygote {
+        let len = R::chromosome_genes_amount() / 64;
         let d = (0..len).map(|_| rand::random::<u64>()).collect();
         let v = (0..len).map(|_| rand::random::<u64>()).collect();
         let dominance = U64s::new(d);
@@ -71,13 +71,13 @@ impl RandomUtils for RandomUtilsStruct {
 }
 
 pub trait ChoosingProbability {
-    fn select_individual_with_probability(&self, fitness: f64) -> bool;
+    fn select_individual_with_probability(fitness: f64) -> bool;
 }
 
 pub struct RandomChoosingProbability;
 
 impl ChoosingProbability for RandomChoosingProbability {
-    fn select_individual_with_probability(&self, fitness: f64) -> bool {
+    fn select_individual_with_probability(fitness: f64) -> bool {
         fitness > rand::random::<f64>()
     }
 }
@@ -85,7 +85,7 @@ impl ChoosingProbability for RandomChoosingProbability {
 pub struct PerfChoosingProbability;
 
 impl ChoosingProbability for PerfChoosingProbability {
-    fn select_individual_with_probability(&self, _fitness: f64) -> bool {
+    fn select_individual_with_probability(_fitness: f64) -> bool {
         true
     }
 }

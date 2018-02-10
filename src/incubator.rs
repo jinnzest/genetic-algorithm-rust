@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::marker::PhantomData;
 
 use crate::{
     breeding::Breeding,
@@ -9,35 +9,40 @@ use crate::{
         find_worst_individual,
     },
     individual::Individual,
-    random_utils::ChoosingProbability,
+    random_utils::{ChoosingProbability, RandomUtils},
 };
 
-pub struct Incubator {
-    breeding: Rc<dyn Breeding>,
-    fitness_calculator: Rc<dyn FitnessCalculator>,
-    new_generation: Generation,
-    old_generation: Generation,
+pub struct Incubator<
+    RU: RandomUtils,
+    CP: ChoosingProbability,
+    B: Breeding<RU>,
+    FC: FitnessCalculator,
+> {
+    new_generation: Generation<CP>,
+    old_generation: Generation<CP>,
     tmp_chromosome: Chromosome,
+    _phantom_b: PhantomData<B>,
+    _phantom_fc: PhantomData<FC>,
+    _phantom_ru: PhantomData<RU>,
 }
 
-impl Incubator {
-    pub fn new(
-        chromosomes_amount: usize,
-        breeding: Rc<dyn Breeding>,
-        fitness_calculator: Rc<dyn FitnessCalculator>,
-        choosing_probability: Rc<dyn ChoosingProbability>,
-    ) -> Incubator {
+impl<RU: RandomUtils, CP: ChoosingProbability, B: Breeding<RU>, FC: FitnessCalculator>
+    Incubator<RU, CP, B, FC>
+{
+    pub fn new(chromosomes_amount: usize) -> Self {
         let individuals = (0..chromosomes_amount)
-            .map(|_| Incubator::generate_individual(breeding.clone(), fitness_calculator.clone()))
+            .map(|_| Incubator::<RU, CP, B, FC>::generate_individual())
             .collect::<Vec<Individual>>();
-        Incubator {
-            breeding: breeding.clone(),
-            fitness_calculator: fitness_calculator.clone(),
-            new_generation: Generation::new(individuals.clone(), choosing_probability.clone()),
-            old_generation: Generation::new(individuals, choosing_probability.clone()),
-            tmp_chromosome: breeding.generate_chromosome(),
+        Self {
+            new_generation: Generation::new(individuals.clone()),
+            old_generation: Generation::new(individuals),
+            tmp_chromosome: B::generate_chromosome(),
+            _phantom_b: PhantomData,
+            _phantom_fc: PhantomData,
+            _phantom_ru: PhantomData,
         }
     }
+
     pub fn get_best_individual(&self) -> &Individual {
         find_best_individual(&self.new_generation.individuals)
     }
@@ -53,11 +58,8 @@ impl Incubator {
             let new_individual = &mut self.new_generation.individuals[pos];
             new_individual.chromosome.overwrite(&pair.first.chromosome);
             self.tmp_chromosome.overwrite(&pair.second.chromosome);
-            self.breeding
-                .conception(&mut new_individual.chromosome, &self.tmp_chromosome);
-            new_individual.fitness = self
-                .fitness_calculator
-                .calc_fitness(&new_individual.chromosome.decode_genotype());
+            B::conception(&mut new_individual.chromosome, &self.tmp_chromosome);
+            new_individual.fitness = FC::calc_fitness(&new_individual.chromosome.decode_genotype());
         }
     }
 
@@ -68,13 +70,10 @@ impl Incubator {
         self.old_generation.min_fitness = find_worst_fitness(&self.old_generation.individuals);
     }
 
-    fn generate_individual(
-        breeding: Rc<dyn Breeding>,
-        fitness_calculator: Rc<dyn FitnessCalculator>,
-    ) -> Individual {
-        let chromosome = breeding.generate_chromosome();
+    fn generate_individual() -> Individual {
+        let chromosome = B::generate_chromosome();
         Individual {
-            fitness: fitness_calculator.calc_fitness(&chromosome.decode_genotype()),
+            fitness: FC::calc_fitness(&chromosome.decode_genotype()),
             chromosome,
         }
     }
