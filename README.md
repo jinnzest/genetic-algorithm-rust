@@ -15,3 +15,4 @@ Optimization steps and measurements:
 3. Hash map is replaced by function with pattern matching: 11891678 ms, ~ 20% faster than initial one
 4. Instead of parent pairs their position pairs are returned thus reducing cloning: 10931510 ms, ~ 30% faster than initial one
 5. Vec of genes is replaced by vec of u64s: 92167 ms, ~ 155 times faster than initial one
+6. Second generation is added to incubator to use it as cache thus reducing cloning: 32686 ms, ~ 439 times faster than initial one

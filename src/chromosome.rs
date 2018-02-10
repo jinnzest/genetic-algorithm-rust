@@ -28,6 +28,11 @@ impl Chromosome {
         }
     }
 
+    pub fn overwrite(&mut self, source: &Chromosome) {
+        self.dominant.overwrite(&source.dominant);
+        self.recessive.overwrite(&source.recessive);
+    }
+
     pub fn decode_genotype(&self) -> Vec<u64> {
         let mut p = 0;
         let mut decoded = Vec::with_capacity(self.dominant.u64s_amount());
@@ -48,40 +53,19 @@ impl Chromosome {
             recessive: recessive.parse::<Zygote>().unwrap(),
         }
     }
-    pub fn cross_zygotes(&mut self, begin: usize, amount: usize) -> Chromosome {
-        self.dominant.cross(
+    pub fn cross_zygotes(&mut self, begin: usize, amount: usize) {
+        self.dominant.cross_bidirectional(
             &mut self.recessive,
             begin,
             amount,
-            true,
         );
-        self.clone()
     }
-    pub fn cross_chromosomes(&self, that: &Chromosome, begin: usize, amount: usize) -> Chromosome {
-        let mut new_chr = Chromosome {
-            dominant: self.dominant.clone(),
-            recessive: self.recessive.clone(),
-        };
-
-        new_chr.dominant.cross(
-            &mut that.dominant.clone(),
-            begin,
-            amount,
-            false,
-        );
-        new_chr.recessive.cross(
-            &mut that.recessive.clone(),
-            begin,
-            amount,
-            false,
-        );
-        new_chr
+    pub fn cross_chromosomes(&mut self, that: &Chromosome, begin: usize, amount: usize) {
+        self.dominant.cross(&that.dominant, begin, amount);
+        self.recessive.cross(&that.recessive, begin, amount);
     }
-    pub fn mutate(&self, pos: usize, new_gen: &Gen) -> Chromosome {
-        Chromosome {
-            dominant: self.dominant.mutate(pos, new_gen),
-            recessive: self.recessive.clone(),
-        }
+    pub fn mutate(&mut self, pos: usize, new_gen: &Gen) {
+        self.dominant.mutate(pos, new_gen);
     }
 }
 
@@ -169,7 +153,7 @@ mod crossing_zygote {
 
     #[test]
     fn cross_chromosomes() {
-        let first = Chromosome::from_strings(
+        let mut first = Chromosome::from_strings(
             "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
             "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
         );
@@ -177,8 +161,9 @@ mod crossing_zygote {
             "DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD",
             "RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR",
         );
+        first.cross_chromosomes(&mut second, 1, 2);
         assert_eq!(
-            first.cross_chromosomes(&mut second, 1, 2).to_string(),
+            first.to_string(),
             "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dDDd\
             \nrrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rRRr"
         )
@@ -186,12 +171,13 @@ mod crossing_zygote {
 
     #[test]
     fn mutate_gen_in_dominant() {
-        let chr = Chromosome::from_strings(
+        let mut chr = Chromosome::from_strings(
             "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
             "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
         );
+        chr.mutate(2, &Gen::R1);
         assert_eq!(
-            chr.mutate(2, &Gen::R1).to_string(),
+            chr.to_string(),
             "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dRdd\
             \nrrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr"
         )
