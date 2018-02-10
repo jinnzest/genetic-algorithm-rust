@@ -1,35 +1,6 @@
 use zygote::Zygote;
-use std::collections::HashMap;
 use std::fmt;
 use gen::Gen;
-
-#[allow(dead_code)]
-lazy_static! {
-#[allow(dead_code)]
-static ref DECODING_RULES: HashMap<(Gen, Gen), bool> = {
-    let mut hm = HashMap::new();
-    hm.insert((Gen::D1, Gen::D0), true);
-    hm.insert((Gen::D1, Gen::D1), true);
-    hm.insert((Gen::D1, Gen::R1), true);
-    hm.insert((Gen::D1, Gen::R0), true);
-
-    hm.insert((Gen::D0, Gen::D0), false);
-    hm.insert((Gen::D0, Gen::D1), false);
-    hm.insert((Gen::D0, Gen::R1), false);
-    hm.insert((Gen::D0, Gen::R0), false);
-
-    hm.insert((Gen::R1, Gen::D0), false);
-    hm.insert((Gen::R1, Gen::D1), true);
-    hm.insert((Gen::R1, Gen::R1), true);
-    hm.insert((Gen::R1, Gen::R0), true);
-
-    hm.insert((Gen::R0, Gen::D0), false);
-    hm.insert((Gen::R0, Gen::D1), true);
-    hm.insert((Gen::R0, Gen::R1), false);
-    hm.insert((Gen::R0, Gen::R0), false);
-    hm
-};
-}
 
 #[derive(Clone)]
 pub struct Chromosome {
@@ -56,17 +27,37 @@ impl Chromosome {
             recessive,
         }
     }
+
+    fn decode(genes: &(Gen, Gen)) -> bool {
+        match *genes {
+            (Gen::D1, Gen::D0) |
+            (Gen::D1, Gen::D1) |
+            (Gen::D1, Gen::R1) |
+            (Gen::D1, Gen::R0) |
+            (Gen::R1, Gen::D1) |
+            (Gen::R1, Gen::R1) |
+            (Gen::R1, Gen::R0) |
+            (Gen::R0, Gen::D1) => true,
+
+            (Gen::D0, Gen::D0) |
+            (Gen::D0, Gen::D1) |
+            (Gen::D0, Gen::R1) |
+            (Gen::D0, Gen::R0) |
+            (Gen::R1, Gen::D0) |
+            (Gen::R0, Gen::D0) |
+            (Gen::R0, Gen::R1) |
+            (Gen::R0, Gen::R0) => false,
+        }
+    }
+
     pub fn decode_genotype(&self) -> Vec<bool> {
         let pairs = self.dominant.get_genes().into_iter().zip(
             self.recessive
                 .get_genes(),
         );
-        pairs
-            .map(|(d, r)| DECODING_RULES.get(&(d, r)))
-            .map(|o| o.unwrap())
-            .cloned()
-            .collect()
+        pairs.map(|genes| Chromosome::decode(&genes)).collect()
     }
+    #[allow(dead_code)]
     fn from_strings(dominant: &str, recessive: &str) -> Chromosome {
         Chromosome {
             dominant: dominant.parse::<Zygote>().unwrap(),
@@ -118,13 +109,13 @@ mod decoding_first_zygote_with_dominant_genes {
     #[test]
     fn must_override_recessive_genes_of_second_one() {
         let chr = Chromosome::from_strings("DDdd", "RrRr");
-        assert_eq!(bools_to_str(&chr.decode_genotype()), "1100");
+        assert_eq!(_bools_to_str(&chr.decode_genotype()), "1100");
     }
 
     #[test]
     fn must_override_dominant_genes_of_second_one() {
         let chr = Chromosome::from_strings("DDdd", "DdDd");
-        assert_eq!(bools_to_str(&chr.decode_genotype()), "1100");
+        assert_eq!(_bools_to_str(&chr.decode_genotype()), "1100");
     }
 }
 
@@ -135,13 +126,13 @@ mod decoding_first_zygote_with_recessive_genes {
     #[test]
     fn must_override_recessive_genes_of_second_one() {
         let chr = Chromosome::from_strings("RRrr", "RrRr");
-        assert_eq!(bools_to_str(&chr.decode_genotype()), "1100");
+        assert_eq!(_bools_to_str(&chr.decode_genotype()), "1100");
     }
 
     #[test]
     fn must_override_dominant_genes_of_second_one() {
         let chr = Chromosome::from_strings("RRrr", "DdDd");
-        assert_eq!(bools_to_str(&chr.decode_genotype()), "1010");
+        assert_eq!(_bools_to_str(&chr.decode_genotype()), "1010");
     }
 }
 
@@ -157,8 +148,10 @@ mod crossing_zygote {
         );
         assert_eq!(
             chr.cross_zygotes(2, 3).to_string(),
-            "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddr rrdd\
-            \nrrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrd ddrr"
+            Chromosome::from_strings(
+                "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddr rrdd",
+                "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrd ddrr",
+            ).to_string()
         );
     }
 
@@ -204,7 +197,7 @@ mod crossing_zygote {
     }
 }
 
-fn bools_to_str(bools: &[bool]) -> String {
+fn _bools_to_str(bools: &[bool]) -> String {
     bools
         .iter()
         .map(|b| if *b { '1' } else { '0' })

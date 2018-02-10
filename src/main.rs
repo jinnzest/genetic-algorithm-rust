@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![cfg_attr(test, feature(plugin))]
 #![cfg_attr(test, plugin(quickcheck_macros))]
 
@@ -13,11 +12,11 @@ extern crate comp;
 extern crate lazy_static;
 extern crate conv;
 
-pub mod global_constants;
 pub mod utils;
+pub mod global_constants;
 pub mod gen;
-pub mod zygote;
 pub mod random_utils;
+pub mod zygote;
 pub mod chromosome;
 pub mod individual;
 pub mod generation;
