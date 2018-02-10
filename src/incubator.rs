@@ -52,7 +52,8 @@ impl<RU: RandomUtils, CP: ChoosingProbability, B: Breeding<RU>, FC: FitnessCalcu
             let first = &individuals[pair.first_pos].chromosome;
             let second = &individuals[pair.second_pos].chromosome;
             B::conception(first, second, &mut child);
-            new_individual.fitness = FC::calc_fitness(&child.decode_genotype());
+            child.decode_genotype();
+            new_individual.fitness = FC::calc_fitness(&child.decoded);
         }
     }
 
@@ -66,9 +67,10 @@ impl<RU: RandomUtils, CP: ChoosingProbability, B: Breeding<RU>, FC: FitnessCalcu
     }
 
     fn generate_individual() -> Individual {
-        let chromosome = B::generate_chromosome();
+        let mut chromosome = B::generate_chromosome();
+        chromosome.decode_genotype();
         Individual {
-            fitness: FC::calc_fitness(&chromosome.decode_genotype()),
+            fitness: FC::calc_fitness(&chromosome.decoded),
             chromosome,
         }
     }
