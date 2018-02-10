@@ -41,14 +41,14 @@ impl<RU: RandomUtils, CP: ChoosingProbability, B: Breeding<RU>, FC: FitnessCalcu
     }
 
     pub fn create_individuals(&mut self) -> Vec<Individual> {
+        let individuals = &self.generation.individuals;
         self.generation
             .select_parent_pairs()
             .iter()
-            .map(|&Parents {
-                 ref first,
-                 ref second,
-             }| {
-                let new_chromosome = B::conception(&first.chromosome, &second.chromosome);
+            .map(|&Parents { first_pos, second_pos }| {
+                let first = &individuals[first_pos].chromosome;
+                let second = &individuals[second_pos].chromosome;
+                let new_chromosome = B::conception(first, second);
                 Individual {
                     fitness: FC::calc_fitness(&new_chromosome.decode_genotype()),
                     chromosome: new_chromosome,

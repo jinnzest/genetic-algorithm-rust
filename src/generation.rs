@@ -6,8 +6,8 @@ use utils;
 
 #[derive(Clone)]
 pub struct Parents {
-    pub first: Individual,
-    pub second: Individual,
+    pub first_pos: usize,
+    pub second_pos: usize,
 }
 
 pub struct Generation<CP: ChoosingProbability> {
@@ -34,18 +34,18 @@ impl<CP: ChoosingProbability> Generation<CP> {
         let mut parents = Vec::new();
         let mut pos = 0;
         while pos < self.individuals.len() {
-            let first_parent_pos = self.find_parent_pos(&mut pos);
-            let mut second_parent_pos = self.find_parent_pos(&mut pos);
-            if first_parent_pos == second_parent_pos {
-                second_parent_pos = if pos > 0 {
+            let first_pos = self.find_parent_pos(&mut pos);
+            let mut second_pos = self.find_parent_pos(&mut pos);
+            if first_pos == second_pos {
+                second_pos = if pos > 0 {
                     pos - 1
                 } else {
                     self.individuals.len() - 1
                 }
             }
             parents.push(Parents {
-                first: self.individuals[first_parent_pos].clone(),
-                second: self.individuals[second_parent_pos].clone(),
+                first_pos,
+                second_pos
             });
             pos += 1;
         }
