@@ -1,11 +1,12 @@
+#![allow(static_mut_refs)]
 extern crate genetic_algorithm;
 
-use genetic_algorithm::breeding;
+use genetic_algorithm::breeding::make_breeding;
 use genetic_algorithm::chromosome::Chromosome;
 use genetic_algorithm::fitness_calculator::FitnessCalculator;
-use genetic_algorithm::gen::Gen;
+use genetic_algorithm::gene::Gene;
 use genetic_algorithm::global_constants::*;
-use genetic_algorithm::incubator;
+use genetic_algorithm::incubator::Incubator;
 use genetic_algorithm::random_utils::{ChoosingProbability, RandomUtils};
 use genetic_algorithm::zygote::Zygote;
 use std::rc::Rc;
@@ -14,46 +15,112 @@ use std::str::FromStr;
 const CHROMOSOMES_AMOUNT: usize = 5;
 static mut MUTATED_CHROMOSOMES: usize = 0;
 static mut POS: usize = 0;
-static mut GEN_FROM: Gen = Gen::D0;
-static mut GEN_TO: Gen = Gen::D0;
+static mut GEN_FROM: Gene = Gene::D0;
+static mut GEN_TO: Gene = Gene::D0;
 static mut SIGN: f64 = 1.0;
 const CHROMOSOME_GENES_AMOUNT: usize = 3 * U64_BITS_AMOUNT;
 
 #[test]
 fn breeding_new_generation_should_replace_all_genes_by_defined_ones_during_a_few_generations() {
     unsafe {
-        GEN_FROM = Gen::D0;
-        GEN_TO = Gen::D1;
+        GEN_FROM = Gene::D0;
+        GEN_TO = Gene::D1;
         MUTATED_CHROMOSOMES = 0;
     };
-    assert_eq!(run_generations(), 568);
-    unsafe {
-        GEN_FROM = Gen::R0;
-        GEN_TO = Gen::R1;
-        MUTATED_CHROMOSOMES = 0;
-    };
-    assert_eq!(run_generations(), 568);
-    unsafe {
-        GEN_FROM = Gen::R0;
-        GEN_TO = Gen::D1;
-        MUTATED_CHROMOSOMES = 0;
-    };
-    assert_eq!(run_generations(), 568);
-    unsafe {
-        GEN_FROM = Gen::R1;
-        GEN_TO = Gen::D0;
-        SIGN = -1.0;
-        MUTATED_CHROMOSOMES = 0;
-    };
-    assert_eq!(run_generations(), 568);
-}
+    assert_eq!(run_generations(), 230);
 
+    unsafe {
+        GEN_FROM = Gene::D0;
+        GEN_TO = Gene::R0;
+        MUTATED_CHROMOSOMES = 0;
+    };
+    assert_eq!(run_generations(), 230);
+
+    unsafe {
+        GEN_FROM = Gene::D0;
+        GEN_TO = Gene::R1;
+        MUTATED_CHROMOSOMES = 0;
+    };
+    assert_eq!(run_generations(), 230);
+
+    unsafe {
+        GEN_FROM = Gene::D1;
+        GEN_TO = Gene::D0;
+        MUTATED_CHROMOSOMES = 0;
+        SIGN = -1.0;
+    };
+    assert_eq!(run_generations(), 230);
+
+    unsafe {
+        GEN_FROM = Gene::D1;
+        GEN_TO = Gene::R0;
+        MUTATED_CHROMOSOMES = 0;
+        SIGN = 1.0;
+    };
+    assert_eq!(run_generations(), 230);
+
+    unsafe {
+        GEN_FROM = Gene::D1;
+        GEN_TO = Gene::R1;
+        MUTATED_CHROMOSOMES = 0;
+        SIGN = 1.0;
+    };
+    assert_eq!(run_generations(), 230);
+
+    unsafe {
+        GEN_FROM = Gene::R0;
+        GEN_TO = Gene::R1;
+        MUTATED_CHROMOSOMES = 0;
+        SIGN = 1.0;
+    };
+    assert_eq!(run_generations(), 230);
+
+    unsafe {
+        GEN_FROM = Gene::R0;
+        GEN_TO = Gene::D0;
+        MUTATED_CHROMOSOMES = 0;
+        SIGN = 1.0;
+    };
+    assert_eq!(run_generations(), 230);
+
+    unsafe {
+        GEN_FROM = Gene::R0;
+        GEN_TO = Gene::D1;
+        MUTATED_CHROMOSOMES = 0;
+        SIGN = 1.0;
+    };
+    assert_eq!(run_generations(), 230);
+
+    unsafe {
+        GEN_FROM = Gene::R1;
+        GEN_TO = Gene::R0;
+        MUTATED_CHROMOSOMES = 0;
+        SIGN = -1.0;
+    };
+    assert_eq!(run_generations(), 230);
+
+    unsafe {
+        GEN_FROM = Gene::R1;
+        GEN_TO = Gene::D0;
+        MUTATED_CHROMOSOMES = 0;
+        SIGN = -1.0;
+    };
+    assert_eq!(run_generations(), 230);
+
+    unsafe {
+        GEN_FROM = Gene::R1;
+        GEN_TO = Gene::D1;
+        MUTATED_CHROMOSOMES = 0;
+        SIGN = 1.0;
+    };
+    assert_eq!(run_generations(), 230);
+}
 pub struct RandomUtilsMock;
 
 pub struct ChoosingProbabilityMock;
 
 impl ChoosingProbability for ChoosingProbabilityMock {
-    fn select_individual_probability(&self, fitness: f64) -> bool {
+    fn select_individual_with_probability(&self, fitness: f64) -> bool {
         fitness >= 0.5f64
     }
 }
@@ -91,7 +158,7 @@ impl RandomUtils for RandomUtilsMock {
         true
     }
 
-    fn rand_gen(&self) -> Gen {
+    fn rand_gen(&self) -> Gene {
         unsafe { GEN_TO.clone() }
     }
 
@@ -111,8 +178,8 @@ impl FitnessCalculator for FitnessCalculatorMock {
     fn calc_fitness(&self, decoded_genotype: &[bool]) -> f64 {
         let sum = decoded_genotype
             .iter()
-            .fold(0.0, |acc, &b| acc + (if b { 1.0 } else { 0.0 }));
-        unsafe { sum * SIGN }
+            .fold(0u64, |acc, &bit| if bit { acc + 1 } else { acc });
+        unsafe { sum as f64 * SIGN }
     }
 }
 
@@ -130,23 +197,22 @@ fn all_chromosomes_are_degenerated(chromosomes: &[Chromosome]) -> bool {
 }
 
 fn run_generations() -> usize {
-    let random_utils: Rc<RandomUtils> = Rc::new(RandomUtilsMock);
-    let fitness_calculator: Rc<FitnessCalculator> = Rc::new(FitnessCalculatorMock);
-    let rc: Rc<ChoosingProbability> = Rc::new(ChoosingProbabilityMock);
+    let random_utils: Rc<dyn RandomUtils> = Rc::new(RandomUtilsMock);
+    let fitness_calculator: Rc<dyn FitnessCalculator> = Rc::new(FitnessCalculatorMock);
+    let choosing_probability: Rc<dyn ChoosingProbability> = Rc::new(ChoosingProbabilityMock);
 
-    let mut incubator = incubator::make_incubator(
+    let mut incubator = Incubator::new(
         CHROMOSOMES_AMOUNT,
-        &breeding::make_breeding(Rc::clone(&random_utils)),
-        &fitness_calculator,
-        &random_utils,
-        &rc,
+        make_breeding(random_utils.clone()).clone(),
+        fitness_calculator.clone(),
+        choosing_probability.clone(),
     );
 
-    let mut gen_count: usize = 0;
+    let mut gene_count: usize = 0;
     while !all_chromosomes_are_degenerated(&incubator.get_chromosomes()) {
         incubator.make_next_generation();
-        gen_count += 1;
+        gene_count += 1;
     }
-    println!("{}", gen_count);
-    gen_count
+    println!("{}", gene_count);
+    gene_count
 }

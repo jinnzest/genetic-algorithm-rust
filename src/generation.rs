@@ -1,7 +1,6 @@
-use individual::Individual;
-use random_utils::ChoosingProbability;
 use std::rc::Rc;
-use utils;
+
+use crate::{individual::Individual, random_utils::ChoosingProbability, utils::normalize_fitness};
 
 #[derive(Clone)]
 pub struct Parents {
@@ -13,53 +12,43 @@ pub struct Generation {
     pub individuals: Vec<Individual>,
     pub min_fitness: f64,
     pub max_fitness: f64,
-    choosing_probability: Rc<ChoosingProbability>,
-}
-
-pub fn make_generation(
-    individuals: Vec<Individual>,
-    choosing_probability: &Rc<ChoosingProbability>,
-) -> Rc<Generation> {
-    let overage_fitness = calc_overage_fitness(&individuals);
-    let min_fitness = find_worst_fitness(&individuals, overage_fitness);
-    let max_fitness = find_best_fitness(&individuals);
-    Rc::new(Generation {
-        min_fitness,
-        max_fitness,
-        individuals,
-        choosing_probability: Rc::clone(choosing_probability),
-    })
+    choosing_probability: Rc<dyn ChoosingProbability>,
 }
 
 impl Generation {
+    pub fn new(
+        individuals: Vec<Individual>,
+        choosing_probability: Rc<dyn ChoosingProbability>,
+    ) -> Generation {
+        let min_fitness = find_worst_fitness(&individuals);
+        let max_fitness = find_best_fitness(&individuals);
+        Generation {
+            min_fitness,
+            max_fitness,
+            individuals,
+            choosing_probability: choosing_probability.clone(),
+        }
+    }
     pub fn select_parent_pairs(&self) -> Vec<Parents> {
         let mut parents = Vec::new();
         let mut pos = 0;
-        while pos < self.individuals.len() {
-            let first_parent_pos = self.find_parent_pos(&mut pos);
-            let mut second_parent_pos = self.find_parent_pos(&mut pos);
-            if first_parent_pos == second_parent_pos {
-                second_parent_pos = if pos > 0 {
-                    pos - 1
-                } else {
-                    self.individuals.len() - 1
-                }
-            }
+        while parents.len() < self.individuals.len() {
+            let first_parent_pos = self.find_parent_pos(&mut pos, None);
+            let second_parent_pos = self.find_parent_pos(&mut pos, Some(first_parent_pos));
             parents.push(Parents {
                 first: self.individuals[first_parent_pos].clone(),
                 second: self.individuals[second_parent_pos].clone(),
             });
-            pos += 1;
         }
         parents
     }
 
-    fn find_parent_pos(&self, pos: &mut usize) -> usize {
+    fn find_parent_pos(&self, pos: &mut usize, skip_pos: Option<usize>) -> usize {
         loop {
             let candidate = &self.individuals[*pos];
             if self
                 .choosing_probability
-                .select_individual_probability(utils::normalize_fitness(
+                .select_individual_with_probability(normalize_fitness(
                     candidate.fitness,
                     self.min_fitness,
                     self.max_fitness,
@@ -67,77 +56,47 @@ impl Generation {
             {
                 return *pos;
             }
-            if *pos < self.individuals.len() - 1 {
-                *pos += 1;
-            } else {
-                *pos = 0;
+            loop {
+                if *pos < self.individuals.len() - 1 {
+                    *pos += 1;
+                } else {
+                    *pos = 0;
+                }
+                if Some(*pos) != skip_pos {
+                    break;
+                }
             }
         }
     }
 }
 
-pub fn calc_overage_fitness(individuals: &[Individual]) -> f64 {
-    let fitnesses_sum: f64 = individuals.iter().map(|i| i.fitness).sum();
-    fitnesses_sum / individuals.len() as f64
-}
-
-pub fn find_best_individual(individuals: &[Individual]) -> Individual {
+pub fn find_individual_by(
+    individuals: &[Individual],
+    comparator: impl Fn(f64, f64) -> bool,
+) -> &Individual {
     individuals
         .iter()
         .fold(individuals.first().unwrap(), |acc, i| {
-            if acc.fitness > i.fitness {
+            if comparator(acc.fitness, i.fitness) {
                 i
             } else {
                 acc
             }
         })
-        .clone()
 }
 
-pub fn find_worst_individual(individuals: &[Individual], overage_fitness: f64) -> Individual {
-    individuals
-        .iter()
-        .fold(individuals.first().unwrap(), |acc, i| {
-            if acc.fitness > i.fitness && filter_out_unviable_fetus(i, overage_fitness) {
-                i
-            } else {
-                acc
-            }
-        })
-        .clone()
+pub fn find_best_individual(individuals: &[Individual]) -> &Individual {
+    find_individual_by(individuals, |acc, i| acc < i)
+}
+
+pub fn find_worst_individual(individuals: &[Individual]) -> &Individual {
+    find_individual_by(individuals, |acc, i| acc > i)
 }
 
 pub fn find_best_fitness(individuals: &[Individual]) -> f64 {
-    individuals
-        .iter()
-        .fold(individuals.first().unwrap(), |acc, i| {
-            if acc.fitness < i.fitness {
-                i
-            } else {
-                acc
-            }
-        })
-        .fitness
+    find_individual_by(individuals, |acc, i| acc < i).fitness
 }
 
-fn filter_out_unviable_fetus(i: &Individual, overage_fitness: f64) -> bool {
-    let fitness = if i.fitness == 0.0 {
-        0.0
-    } else {
-        overage_fitness / i.fitness
-    };
-    fitness < 20.0
-}
-
-pub fn find_worst_fitness(individuals: &[Individual], overage_fitness: f64) -> f64 {
-    individuals
-        .iter()
-        .fold(individuals.first().unwrap(), |acc, i| {
-            if acc.fitness > i.fitness && filter_out_unviable_fetus(i, overage_fitness) {
-                i
-            } else {
-                acc
-            }
-        })
-        .fitness
+pub fn find_worst_fitness(individuals: &[Individual]) -> f64 {
+    find_individual_by(individuals, |acc, i| acc > i).fitness
 }
