@@ -1,12 +1,13 @@
-use gen::Gen;
-use global_constants::*;
 use std::fmt;
 use std::marker;
 use std::str;
 
+use crate::gene::Gene;
+use crate::global_constants::U64_BITS_AMOUNT;
+
 #[derive(Clone)]
 pub struct Zygote {
-    genes: Vec<Gen>,
+    genes: Vec<Gene>,
 }
 
 impl fmt::Display for Zygote {
@@ -15,10 +16,10 @@ impl fmt::Display for Zygote {
             .genes
             .iter()
             .map(|g| match *g {
-                Gen::D1 => 'D',
-                Gen::D0 => 'd',
-                Gen::R1 => 'R',
-                Gen::R0 => 'r',
+                Gene::D1 => 'D',
+                Gene::D0 => 'd',
+                Gene::R1 => 'R',
+                Gene::R0 => 'r',
             })
             .rev()
             .collect::<Vec<char>>();
@@ -42,16 +43,15 @@ impl str::FromStr for Zygote {
         let result_gens = filtered
             .chars()
             .map(|c| match c {
-                'D' => Ok(Gen::D1),
-                'd' => Ok(Gen::D0),
-                'R' => Ok(Gen::R1),
-                'r' => Ok(Gen::R0),
+                'D' => Ok(Gene::D1),
+                'd' => Ok(Gene::D0),
+                'R' => Ok(Gene::R1),
+                'r' => Ok(Gene::R0),
                 _ => Err(c),
             })
             .rev()
-            .collect::<Vec<Result<Gen, char>>>();
+            .collect::<Vec<Result<Gene, char>>>();
         let unexpected_char = result_gens.iter().find(|c| c.is_err());
-        //        let unexpected_char: Option<Result<Gen, char>> = None;
         match unexpected_char {
             Some(c) => Err(format!(
                 "unexpected character in genes string: {}",
@@ -62,7 +62,7 @@ impl str::FromStr for Zygote {
                     .clone()
                     .into_iter()
                     .map(|c| c.unwrap())
-                    .collect::<Vec<Gen>>();
+                    .collect::<Vec<Gene>>();
                 Ok(Zygote::new(genes))
             }
         }
@@ -70,18 +70,18 @@ impl str::FromStr for Zygote {
 }
 
 impl Zygote {
-    pub fn new(genes: Vec<Gen>) -> Self {
+    pub fn new(genes: Vec<Gene>) -> Self {
         Self { genes }
     }
 
-    pub fn get_genes(&self) -> Vec<Gen> {
+    pub fn get_genes(&self) -> Vec<Gene> {
         self.genes.clone()
     }
 
-    pub fn mutate(&self, pos: usize, new_gen: &Gen) -> Zygote {
+    pub fn mutate(&self, pos: usize, new_gen: &Gene) -> Zygote {
         let mut genes = self.genes.clone();
         genes[pos] = new_gen.clone();
-        Zygote { genes: genes }
+        Zygote { genes }
     }
 
     pub fn cross(&self, that: &Zygote, begin: usize, amount: usize) -> Zygote {
@@ -94,13 +94,9 @@ impl Zygote {
         Zygote { genes: vec }
     }
 
-    fn split_genes(&self, begin: usize, amount: usize) -> (&[Gen], &[Gen], &[Gen]) {
+    fn split_genes(&self, begin: usize, amount: usize) -> (&[Gene], &[Gene], &[Gene]) {
         fn normalize_pos(p: usize, len: usize) -> usize {
-            if p > len - 1 {
-                len
-            } else {
-                p
-            }
+            if p > len - 1 { len } else { p }
         }
 
         let n_begin = normalize_pos(begin, self.genes.len());
@@ -113,18 +109,22 @@ impl Zygote {
 
 #[cfg(test)]
 mod to_and_from_str {
+    use crate::gene;
+
     use super::*;
-    use gen::VecGen;
-    use quickcheck;
+    use gene::VecGen;
+    use quickcheck::{Arbitrary, Gen, quickcheck};
     use std::iter;
     use std::str::FromStr;
 
-    impl quickcheck::Arbitrary for Gen {
-        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
-            g.gen()
+    impl Arbitrary for Gene {
+        fn arbitrary(g: &mut Gen) -> Self {
+            g.choose(&[Gene::D0, Gene::D1, Gene::R0, Gene::R1])
+                .unwrap()
+                .clone()
         }
 
-        fn shrink(&self) -> Box<Iterator<Item = Self>> {
+        fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
             Box::new(iter::empty())
         }
     }
@@ -133,7 +133,7 @@ mod to_and_from_str {
     fn zygote_to_str() {
         assert_eq!(
             Zygote {
-                genes: vec![Gen::D1, Gen::D0, Gen::R1, Gen::R0]
+                genes: vec![Gene::D1, Gene::D0, Gene::R1, Gene::R0]
             }
             .to_string(),
             "rRdD"
@@ -144,7 +144,7 @@ mod to_and_from_str {
     fn str_to_zygote() {
         assert_eq!(
             Zygote::from_str("rRdD").unwrap().genes,
-            vec![Gen::D1, Gen::D0, Gen::R1, Gen::R0]
+            vec![Gene::D1, Gene::D0, Gene::R1, Gene::R0]
         );
     }
 
@@ -152,22 +152,23 @@ mod to_and_from_str {
     fn str_to_zygote_drops_spaces() {
         assert_eq!(
             Zygote::from_str(" r  R d      D  ").unwrap().genes,
-            vec![Gen::D1, Gen::D0, Gen::R1, Gen::R0]
+            vec![Gene::D1, Gene::D0, Gene::R1, Gene::R0]
         );
     }
 
-    #[quickcheck]
-    fn to_and_from_str_genes(genes: Vec<Gen>) -> bool {
-        if genes.is_empty() {
-            true
-        } else {
-            let genes_str = format!("{}", VecGen::new(genes));
-            let zgt = Zygote::from_str(&genes_str).unwrap();
-            let back_str = format!("{}", zgt);
-            let filtered_back: String = drop_spaces(&back_str);
-            let aligned_genes = format!("{:r>1$}", genes_str, filtered_back.len());
-            println!("from: {}\nto  : {}", aligned_genes, filtered_back);
-            aligned_genes == filtered_back
+    quickcheck! {
+        fn to_and_from_str_genes(genes: Vec<Gene>) -> bool {
+            if genes.is_empty() {
+                true
+            } else {
+                let genes_str = format!("{}", VecGen::new(genes));
+                let zgt = Zygote::from_str(&genes_str).unwrap();
+                let back_str = format!("{}", zgt);
+                let filtered_back: String = drop_spaces(&back_str);
+                let aligned_genes = format!("{:r>1$}", genes_str, filtered_back.len());
+                println!("from: {}\nto  : {}", aligned_genes, filtered_back);
+                aligned_genes == filtered_back
+            }
         }
     }
 }
@@ -175,12 +176,15 @@ mod to_and_from_str {
 #[cfg(test)]
 mod mutating {
 
+    use crate::gene;
+
     use super::*;
-    use gen::*;
+    use gene::*;
+    use quickcheck::quickcheck;
     use std::str::FromStr;
 
-    #[quickcheck]
-    fn not_modify_genes_outside_defined_pos(genes: Vec<Gen>, pos: usize, new_gen: Gen) -> bool {
+    quickcheck! {
+    fn not_modify_genes_outside_defined_pos(genes: Vec<Gene>, pos: usize, new_gen: Gene) -> bool {
         if genes.is_empty() {
             true
         } else {
@@ -216,20 +220,21 @@ mod mutating {
             });
             res
         }
-    }
+    }}
 
-    #[quickcheck]
-    fn modify_gen_defined_by_pos(genes: Vec<Gen>, pos: usize, new_gen: Gen) -> bool {
-        if genes.is_empty() {
-            true
-        } else {
-            let n_pos = pos % genes.len();
-            let zgt = Zygote { genes: genes };
-            let mutated_gen = zgt.mutate(n_pos, &new_gen);
-            let (res, _) = mutated_gen.genes.iter().fold((true, 0), |(acc, p), g| {
-                (acc && if p == pos { *g == new_gen } else { true }, p + 1)
-            });
-            res
+    quickcheck! {
+        fn modify_gene_defined_by_pos(genes: Vec<Gene>, pos: usize, new_gen: Gene) -> bool {
+            if genes.is_empty() {
+                true
+            } else {
+                let n_pos = pos % genes.len();
+                let zgt = Zygote { genes: genes };
+                let mutated_gen = zgt.mutate(n_pos, &new_gen);
+                let (res, _) = mutated_gen.genes.iter().fold((true, 0), |(acc, p), g| {
+                    (acc && if p == pos { *g == new_gen } else { true }, p + 1)
+                });
+                res
+            }
         }
     }
 }
@@ -241,34 +246,34 @@ mod crossing {
 
     #[test]
     fn cross_parts() {
-        let crossed: Result<Zygote, String> = result! {
-                let zgt1 <- Zygote::from_str(
-                    "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd"
-                );
-                let zgt2 <- Zygote::from_str(
-                    "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr"
-                );
-                zgt1.cross(&zgt2, 3, 4)
-        };
+        let zgt1 = Zygote::from_str(
+            "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
+        )
+        .unwrap();
+        let zgt2 = Zygote::from_str(
+            "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
+        )
+        .unwrap();
+        let crossed = zgt1.cross(&zgt2, 3, 4);
         assert_eq!(
-            crossed.unwrap().to_string(),
+            crossed.to_string(),
             "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd drrr rddd"
         )
     }
 
     #[test]
     fn cross_parts_when_end_pos_bigger_than_size() {
-        let crossed: Result<Zygote, String> = result! {
-            let zgt1 <- Zygote::from_str(
-                "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd"
-            );
-            let zgt2 <- Zygote::from_str(
-                "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr"
-            );
-            zgt1.cross(&zgt2, 3, 100)
-        };
+        let zgt1 = Zygote::from_str(
+            "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
+        )
+        .unwrap();
+        let zgt2 = Zygote::from_str(
+            "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
+        )
+        .unwrap();
+        let crossed = zgt1.cross(&zgt2, 3, 100);
         assert_eq!(
-            crossed.unwrap().to_string(),
+            crossed.to_string(),
             "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rddd"
         )
     }
@@ -285,7 +290,7 @@ where
     fn grouped(&self, p: usize) -> Vec<Vec<char>>;
 }
 
-impl<'a> Grouped for &'a [char] {
+impl Grouped for &'_ [char] {
     fn grouped(&self, p: usize) -> Vec<Vec<char>> {
         let mut vec = Vec::new();
         let mut pos = 0;

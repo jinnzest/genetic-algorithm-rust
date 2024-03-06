@@ -1,14 +1,12 @@
-use global_constants::*;
+use crate::global_constants::U64_BITS_AMOUNT;
 
 pub fn normalize_fitness(fitness: f64, min_fitness: f64, max_fitness: f64) -> f64 {
     let based_fitness = fitness - min_fitness;
     let fitness_range = max_fitness - min_fitness;
-    if fitness < min_fitness {
-        0.0
-    } else if fitness_range != 0.0 {
-        based_fitness / fitness_range
-    } else {
+    if fitness_range == 0.0 {
         1.0
+    } else {
+        based_fitness / fitness_range
     }
 }
 
@@ -28,12 +26,12 @@ fn decode_bools_to_u64(a: &[bool]) -> u64 {
 pub fn decode_bools_to_u64s(bits: &[bool]) -> Vec<u64> {
     let mut bits_from = bits.to_vec();
     let u64ss_size = bits.len() / U64_BITS_AMOUNT
-        + (if bits.len() % U64_BITS_AMOUNT > 0 {
+        + (if !bits.len().is_multiple_of(U64_BITS_AMOUNT) {
             1
         } else {
             0
         });
-    let mut u64s = Vec::with_capacity(u64ss_size);
+    let mut u64s = vec![0; u64ss_size];
     u64s.resize(u64ss_size, 0);
     for pos in (1..u64ss_size + 1).rev() {
         let len = bits_from.len();
@@ -89,8 +87,8 @@ mod decode_booleans_to_u64s {
     }
 
     #[test]
-    fn input_00000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000011_must_be_3_2(
-    ) {
+    fn input_00000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000011_must_be_3_2()
+     {
         let list_of_52_false = (0..62).fold(Vec::new(), |mut acc, _| {
             acc.push(false);
             acc
@@ -120,6 +118,8 @@ mod normalize_fitness {
         assert_eq!(normalize_fitness(2f64, 1f64, 2f64), 1f64);
         assert_eq!(normalize_fitness(-15f64, -20f64, -10f64), 0.5f64);
         assert_eq!(normalize_fitness(0f64, -10f64, 10f64), 0.5f64);
-        assert_eq!(normalize_fitness(-1_000_000f64, -10f64, 10f64), 0f64);
+        assert_eq!(normalize_fitness(-1f64, -10f64, 10f64), 0.45f64);
+        assert_eq!(normalize_fitness(-9f64, -10f64, 10f64), 0.05f64);
+        assert_eq!(normalize_fitness(9f64, -10f64, 10f64), 0.95f64);
     }
 }

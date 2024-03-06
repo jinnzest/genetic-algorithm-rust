@@ -1,35 +1,33 @@
-use gen::Gen;
 use std::collections::HashMap;
 use std::fmt;
-use zygote::Zygote;
+use std::sync::LazyLock;
 
-#[allow(dead_code)]
-lazy_static! {
-#[allow(dead_code)]
-static ref DECODING_RULES: HashMap<(Gen, Gen), bool> = {
+use crate::gene::Gene;
+use crate::zygote::Zygote;
+
+static DECODING_RULES: LazyLock<HashMap<(Gene, Gene), bool>> = LazyLock::new(|| {
     let mut hm = HashMap::new();
-    hm.insert((Gen::D1, Gen::D0), true);
-    hm.insert((Gen::D1, Gen::D1), true);
-    hm.insert((Gen::D1, Gen::R1), true);
-    hm.insert((Gen::D1, Gen::R0), true);
+    hm.insert((Gene::D1, Gene::D0), true);
+    hm.insert((Gene::D1, Gene::D1), true);
+    hm.insert((Gene::D1, Gene::R1), true);
+    hm.insert((Gene::D1, Gene::R0), true);
 
-    hm.insert((Gen::D0, Gen::D0), false);
-    hm.insert((Gen::D0, Gen::D1), false);
-    hm.insert((Gen::D0, Gen::R1), false);
-    hm.insert((Gen::D0, Gen::R0), false);
+    hm.insert((Gene::D0, Gene::D0), false);
+    hm.insert((Gene::D0, Gene::D1), false);
+    hm.insert((Gene::D0, Gene::R1), false);
+    hm.insert((Gene::D0, Gene::R0), false);
 
-    hm.insert((Gen::R1, Gen::D0), false);
-    hm.insert((Gen::R1, Gen::D1), true);
-    hm.insert((Gen::R1, Gen::R1), true);
-    hm.insert((Gen::R1, Gen::R0), true);
+    hm.insert((Gene::R1, Gene::D0), false);
+    hm.insert((Gene::R1, Gene::D1), true);
+    hm.insert((Gene::R1, Gene::R1), true);
+    hm.insert((Gene::R1, Gene::R0), true);
 
-    hm.insert((Gen::R0, Gen::D0), false);
-    hm.insert((Gen::R0, Gen::D1), true);
-    hm.insert((Gen::R0, Gen::R1), false);
-    hm.insert((Gen::R0, Gen::R0), false);
+    hm.insert((Gene::R0, Gene::D0), false);
+    hm.insert((Gene::R0, Gene::D1), true);
+    hm.insert((Gene::R0, Gene::R1), false);
+    hm.insert((Gene::R0, Gene::R0), false);
     hm
-};
-}
+});
 
 #[derive(Clone)]
 pub struct Chromosome {
@@ -68,12 +66,6 @@ impl Chromosome {
             .cloned()
             .collect()
     }
-    fn from_strings(dominant: &str, recessive: &str) -> Chromosome {
-        Chromosome {
-            dominant: dominant.parse::<Zygote>().unwrap(),
-            recessive: recessive.parse::<Zygote>().unwrap(),
-        }
-    }
     pub fn cross_zygotes(&self, begin: usize, amount: usize) -> Chromosome {
         Chromosome {
             dominant: self.dominant.cross(&self.recessive, begin, amount),
@@ -86,7 +78,7 @@ impl Chromosome {
             recessive: self.recessive.cross(&that.recessive, begin, amount),
         }
     }
-    pub fn mutate(&self, pos: usize, new_gen: &Gen) -> Chromosome {
+    pub fn mutate(&self, pos: usize, new_gen: &Gene) -> Chromosome {
         Chromosome {
             dominant: self.dominant.mutate(pos, new_gen),
             recessive: self.recessive.clone(),
@@ -98,10 +90,25 @@ impl Chromosome {
 mod tests {
     use super::*;
 
+    fn from_strings(dominant: &str, recessive: &str) -> Chromosome {
+        Chromosome {
+            dominant: dominant.parse::<Zygote>().unwrap(),
+            recessive: recessive.parse::<Zygote>().unwrap(),
+        }
+    }
+
+    fn bools_to_str(bools: &[bool]) -> String {
+        bools
+            .iter()
+            .map(|b| if *b { '1' } else { '0' })
+            .rev()
+            .collect()
+    }
+
     #[test]
     fn to_string_should_concat_zygotes() {
         assert_eq!(
-            Chromosome::from_strings(
+            from_strings(
                 "dDrR rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr ",
                 "RrDd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
             )
@@ -110,105 +117,98 @@ mod tests {
             \nRrDd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd"
         )
     }
-}
 
-#[cfg(test)]
-mod decoding_first_zygote_with_dominant_genes {
-    use super::*;
+    #[cfg(test)]
+    mod decoding_first_zygote_with_dominant_genes {
+        use super::*;
 
-    #[test]
-    fn must_override_recessive_genes_of_second_one() {
-        let chr = Chromosome::from_strings("DDdd", "RrRr");
-        assert_eq!(bools_to_str(&chr.decode_genotype()), "1100");
+        #[test]
+        fn must_override_recessive_genes_of_second_one() {
+            let chr = from_strings("DDdd", "RrRr");
+            assert_eq!(bools_to_str(&chr.decode_genotype()), "1100");
+        }
+
+        #[test]
+        fn must_override_dominant_genes_of_second_one() {
+            let chr = from_strings("DDdd", "DdDd");
+            assert_eq!(bools_to_str(&chr.decode_genotype()), "1100");
+        }
     }
 
-    #[test]
-    fn must_override_dominant_genes_of_second_one() {
-        let chr = Chromosome::from_strings("DDdd", "DdDd");
-        assert_eq!(bools_to_str(&chr.decode_genotype()), "1100");
+    #[cfg(test)]
+    mod decoding_first_zygote_with_recessive_genes {
+        use super::*;
+
+        #[test]
+        fn must_override_recessive_genes_of_second_one() {
+            let chr = from_strings("RRrr", "RrRr");
+            assert_eq!(bools_to_str(&chr.decode_genotype()), "1100");
+        }
+
+        #[test]
+        fn must_override_dominant_genes_of_second_one() {
+            let chr = from_strings("RRrr", "DdDd");
+            assert_eq!(bools_to_str(&chr.decode_genotype()), "1010");
+        }
     }
-}
 
-#[cfg(test)]
-mod decoding_first_zygote_with_recessive_genes {
-    use super::*;
+    #[cfg(test)]
+    mod crossing_zygote {
+        use super::*;
+        use quickcheck::quickcheck;
 
-    #[test]
-    fn must_override_recessive_genes_of_second_one() {
-        let chr = Chromosome::from_strings("RRrr", "RrRr");
-        assert_eq!(bools_to_str(&chr.decode_genotype()), "1100");
-    }
-
-    #[test]
-    fn must_override_dominant_genes_of_second_one() {
-        let chr = Chromosome::from_strings("RRrr", "DdDd");
-        assert_eq!(bools_to_str(&chr.decode_genotype()), "1010");
-    }
-}
-
-#[cfg(test)]
-mod crossing_zygote {
-    use super::*;
-
-    #[test]
-    fn must_swap_3_genes_starting_from_pos_2() {
-        let chr = Chromosome::from_strings(
-            "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
-            "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
-        );
-        assert_eq!(
-            chr.cross_zygotes(2, 3).to_string(),
-            "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddr rrdd\
+        #[test]
+        fn must_swap_3_genes_starting_from_pos_2() {
+            let chr = from_strings(
+                "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
+                "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
+            );
+            assert_eq!(
+                chr.cross_zygotes(2, 3).to_string(),
+                "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddr rrdd\
             \nrrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrd ddrr"
-        );
-    }
+            );
+        }
 
-    #[quickcheck]
-    fn must_swap_whole_right_pos_if_amount_is_more_than_length(pos: usize) -> bool {
-        let chr = Chromosome::from_strings(
-            "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
-            "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
-        );
-        chr.cross_zygotes(3, 61 + pos).to_string()
-            == "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rddd\
-            \ndddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd drrr"
-    }
+        quickcheck! {
+        fn must_swap_whole_right_pos_if_amount_is_more_than_length(pos: usize) -> bool {
+            let chr = from_strings(
+                "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
+                "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
+            );
+            chr.cross_zygotes(3, pos.saturating_add(61)).to_string() ==
+                "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rddd\
+                \ndddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd drrr"
+        }}
 
-    #[test]
-    fn cross_chromosomes() {
-        let first = Chromosome::from_strings(
-            "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
-            "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
-        );
-        let second = Chromosome::from_strings(
-            "DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD",
-            "RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR",
-        );
-        assert_eq!(
-            first.cross_chromosomes(&second, 1, 2).to_string(),
-            "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dDDd\
+        #[test]
+        fn cross_chromosomes() {
+            let first = from_strings(
+                "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
+                "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
+            );
+            let second = from_strings(
+                "DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD",
+                "RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR",
+            );
+            assert_eq!(
+                first.cross_chromosomes(&second, 1, 2).to_string(),
+                "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dDDd\
             \nrrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rRRr"
-        )
-    }
+            )
+        }
 
-    #[test]
-    fn mutate_gen_in_dominant() {
-        let chr = Chromosome::from_strings(
-            "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
-            "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
-        );
-        assert_eq!(
-            chr.mutate(2, &Gen::R1).to_string(),
-            "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dRdd\
+        #[test]
+        fn mutate_gene_in_dominant() {
+            let chr = from_strings(
+                "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
+                "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
+            );
+            assert_eq!(
+                chr.mutate(2, &Gene::R1).to_string(),
+                "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dRdd\
             \nrrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr"
-        )
+            )
+        }
     }
-}
-
-fn bools_to_str(bools: &[bool]) -> String {
-    bools
-        .iter()
-        .map(|b| if *b { '1' } else { '0' })
-        .rev()
-        .collect()
 }

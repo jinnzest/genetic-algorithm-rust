@@ -1,21 +1,13 @@
-#![allow(dead_code)]
-#![cfg_attr(test, feature(plugin))]
-#![cfg_attr(test, plugin(quickcheck_macros))]
-
 #[cfg(test)]
 extern crate quickcheck;
+
 extern crate rand;
-#[macro_use]
-extern crate rand_derive;
-#[macro_use]
-extern crate comp;
-#[macro_use]
-extern crate lazy_static;
+extern crate rand_distr;
 
 pub mod breeding;
 pub mod chromosome;
 pub mod fitness_calculator;
-pub mod gen;
+pub mod gene;
 pub mod generation;
 pub mod global_constants;
 pub mod incubator;
@@ -31,6 +23,9 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use utils::*;
 
+use crate::breeding::make_breeding;
+use crate::incubator::Incubator;
+
 impl RandomParams for RandomParamsStruct {
     fn chromosome_genes_amount(&self) -> usize {
         20 * U64_BITS_AMOUNT
@@ -40,23 +35,24 @@ impl RandomParams for RandomParamsStruct {
 impl FitnessCalculator for FitnessCalculatorStruct {
     fn calc_fitness(&self, decoded_genotype: &[bool]) -> f64 {
         let u64s = decode_bools_to_u64s(decoded_genotype);
-        u64s.iter().map(|l| *l as f64).fold(0.0, |acc, d| acc + d)
+        let bits = u64s.iter().fold(0u64, |acc, v| acc | v);
+        if bits == 0 { 0f64 } else { 1f64 }
     }
 }
 
 fn main() {
+    println!("starting...");
     let chromosomes_amount = 1000;
     let random_params = Rc::new(RandomParamsStruct);
-    let random_utils: Rc<RandomUtils> = random_utils::make_random_utils(random_params);
-    let fitness_calculaltor: Rc<FitnessCalculator> = Rc::new(FitnessCalculatorStruct);
-    let perf_choosing_probability: Rc<ChoosingProbability> = Rc::new(PerfChoosingProbability);
+    let random_utils: Rc<dyn RandomUtils> = random_utils::make_random_utils(random_params);
+    let fitness_calculaltor: Rc<dyn FitnessCalculator> = Rc::new(FitnessCalculatorStruct);
+    let perf_choosing_probability: Rc<dyn ChoosingProbability> = Rc::new(PerfChoosingProbability);
 
-    let mut incubator = incubator::make_incubator(
+    let mut incubator = Incubator::new(
         chromosomes_amount,
-        &breeding::make_breeding(Rc::clone(&random_utils)),
-        &fitness_calculaltor,
-        &random_utils,
-        &perf_choosing_probability,
+        make_breeding(random_utils.clone()).clone(),
+        fitness_calculaltor.clone(),
+        perf_choosing_probability.clone(),
     );
 
     let duration = run_and_measure(|| {

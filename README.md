@@ -7,7 +7,3 @@ CPU of the computer used to run measurement: Intel Core i5-4460 @ 3.2 GHz.
 OS: Linux Ubuntu 17, kernel 4.13.0-17
 
 To try it yourself run: cargo build --release && target/release/genetic-algorithm
-
-Optimization steps and measurements: 
-
-1. Without optimization it runs 100000 generations for about 14368590 ms

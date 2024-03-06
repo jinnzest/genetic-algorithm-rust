@@ -1,6 +1,6 @@
-use chromosome::Chromosome;
-use random_utils::RandomUtils;
 use std::rc::Rc;
+
+use crate::{chromosome::Chromosome, random_utils::RandomUtils};
 
 pub trait Breeding {
     fn generate_chromosome(&self) -> Chromosome;
@@ -10,10 +10,10 @@ pub trait Breeding {
 }
 
 pub struct BreedingStruct {
-    random_utils: Rc<RandomUtils>,
+    random_utils: Rc<dyn RandomUtils>,
 }
 
-pub fn make_breeding(random_utils: Rc<RandomUtils>) -> Rc<Breeding> {
+pub fn make_breeding(random_utils: Rc<dyn RandomUtils>) -> Rc<dyn Breeding> {
     Rc::new(BreedingStruct { random_utils })
 }
 

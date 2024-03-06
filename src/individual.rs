@@ -1,5 +1,6 @@
-use chromosome::Chromosome;
 use std::fmt;
+
+use crate::chromosome::Chromosome;
 
 #[derive(Clone)]
 pub struct Individual {
