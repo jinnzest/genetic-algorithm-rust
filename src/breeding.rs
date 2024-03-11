@@ -39,7 +39,7 @@ impl Breeding for BreedingStruct {
         )
     }
 
-    fn attempt_cross_zygotes(&self, chr: Chromosome) -> Chromosome {
+    fn attempt_cross_zygotes(&self, mut chr: Chromosome) -> Chromosome {
         if self.random_utils.should_cross_zygotes() {
             chr.cross_zygotes(
                 self.random_utils.crossing_zygote_pos(),

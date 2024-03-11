@@ -1,7 +1,6 @@
 use std::fmt;
 
-use crate::gene::Gene;
-use crate::zygote::Zygote;
+use crate::{gene::Gene, zygote::Zygote};
 
 #[derive(Clone)]
 pub struct Chromosome {
@@ -29,47 +28,37 @@ impl Chromosome {
         }
     }
 
-    fn decode(genes: &(Gene, Gene)) -> bool {
-        match *genes {
-            (Gene::D1, Gene::D0)
-            | (Gene::D1, Gene::D1)
-            | (Gene::D1, Gene::R1)
-            | (Gene::D1, Gene::R0)
-            | (Gene::R1, Gene::D1)
-            | (Gene::R1, Gene::R1)
-            | (Gene::R1, Gene::R0)
-            | (Gene::R0, Gene::D1) => true,
-
-            (Gene::D0, Gene::D0)
-            | (Gene::D0, Gene::D1)
-            | (Gene::D0, Gene::R1)
-            | (Gene::D0, Gene::R0)
-            | (Gene::R1, Gene::D0)
-            | (Gene::R0, Gene::D0)
-            | (Gene::R0, Gene::R1)
-            | (Gene::R0, Gene::R0) => false,
+    pub fn decode_genotype(&self) -> Vec<u64> {
+        let mut p = 0;
+        let mut decoded = Vec::with_capacity(self.dominant.u64s_amount());
+        while p < self.dominant.u64s_amount() {
+            let dd = self.dominant.get_d_u64(p);
+            let dv = self.dominant.get_v_u64(p);
+            let rd = self.recessive.get_d_u64(p);
+            let rv = self.recessive.get_v_u64(p);
+            decoded.push(dv & !rd | rd & rv & !dd | dd & dv);
+            p += 1
         }
+        decoded
     }
-
-    pub fn decode_genotype(&self) -> Vec<bool> {
-        let pairs = self
-            .dominant
-            .get_genes()
-            .into_iter()
-            .zip(self.recessive.get_genes());
-        pairs.map(|genes| Chromosome::decode(&genes)).collect()
-    }
-    pub fn cross_zygotes(&self, begin: usize, amount: usize) -> Chromosome {
-        Chromosome {
-            dominant: self.dominant.cross(&self.recessive, begin, amount),
-            recessive: self.recessive.cross(&self.dominant, begin, amount),
-        }
+    pub fn cross_zygotes(&mut self, begin: usize, amount: usize) -> Chromosome {
+        self.dominant
+            .cross(&mut self.recessive, begin, amount, true);
+        self.clone()
     }
     pub fn cross_chromosomes(&self, that: &Chromosome, begin: usize, amount: usize) -> Chromosome {
-        Chromosome {
-            dominant: self.dominant.cross(&that.dominant, begin, amount),
-            recessive: self.recessive.cross(&that.recessive, begin, amount),
-        }
+        let mut new_chr = Chromosome {
+            dominant: self.dominant.clone(),
+            recessive: self.recessive.clone(),
+        };
+
+        new_chr
+            .dominant
+            .cross(&mut that.dominant.clone(), begin, amount, false);
+        new_chr
+            .recessive
+            .cross(&mut that.recessive.clone(), begin, amount, false);
+        new_chr
     }
     pub fn mutate(&self, pos: usize, new_gene: &Gene) -> Chromosome {
         Chromosome {
@@ -88,14 +77,6 @@ mod tests {
             dominant: dominant.parse::<Zygote>().unwrap(),
             recessive: recessive.parse::<Zygote>().unwrap(),
         }
-    }
-
-    fn bools_to_str(bools: &[bool]) -> String {
-        bools
-            .iter()
-            .map(|b| if *b { '1' } else { '0' })
-            .rev()
-            .collect()
     }
 
     #[test]
@@ -118,13 +99,13 @@ mod tests {
         #[test]
         fn must_override_recessive_genes_of_second_one() {
             let chr = from_strings("DDdd", "RrRr");
-            assert_eq!(bools_to_str(&chr.decode_genotype()), "1100");
+            assert_eq!(chr.decode_genotype(), vec![0b1100u64]);
         }
 
         #[test]
         fn must_override_dominant_genes_of_second_one() {
             let chr = from_strings("DDdd", "DdDd");
-            assert_eq!(bools_to_str(&chr.decode_genotype()), "1100");
+            assert_eq!(chr.decode_genotype(), vec![0b1100u64]);
         }
     }
 
@@ -135,13 +116,13 @@ mod tests {
         #[test]
         fn must_override_recessive_genes_of_second_one() {
             let chr = from_strings("RRrr", "RrRr");
-            assert_eq!(bools_to_str(&chr.decode_genotype()), "1100");
+            assert_eq!(chr.decode_genotype(), vec![0b1100u64]);
         }
 
         #[test]
         fn must_override_dominant_genes_of_second_one() {
             let chr = from_strings("RRrr", "DdDd");
-            assert_eq!(bools_to_str(&chr.decode_genotype()), "1010");
+            assert_eq!(chr.decode_genotype(), vec![0b1010u64]);
         }
     }
 
@@ -152,20 +133,23 @@ mod tests {
 
         #[test]
         fn must_swap_3_genes_starting_from_pos_2() {
-            let chr = from_strings(
+            let mut chr = from_strings(
                 "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
                 "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
             );
             assert_eq!(
-                chr.cross_zygotes(2, 3).to_string(),
-                "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddr rrdd\
-            \nrrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrd ddrr"
-            );
+            chr.cross_zygotes(2, 3).to_string(),
+            from_strings(
+                "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddr rrdd",
+                "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrd ddrr",
+            )
+            .to_string()
+        );
         }
 
         quickcheck! {
         fn must_swap_whole_right_pos_if_amount_is_more_than_length(pos: usize) -> bool {
-            let chr = from_strings(
+            let mut chr = from_strings(
                 "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
                 "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
             );

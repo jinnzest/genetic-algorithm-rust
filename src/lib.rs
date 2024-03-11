@@ -13,5 +13,6 @@ pub mod global_constants;
 pub mod incubator;
 pub mod individual;
 pub mod random_utils;
+pub mod u64s;
 pub mod utils;
 pub mod zygote;
