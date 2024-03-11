@@ -3,7 +3,11 @@ use std::fmt;
 use std::str;
 
 pub trait U64s {
-    fn cross_bits(&mut self, that: &mut Self, from: usize, amount: usize, bidirectional: bool);
+    fn cross_bits(&mut self, that: &Self, from: usize, amount: usize);
+
+    fn cross_bits_bidirectional(&mut self, that: &mut Self, from: usize, amount: usize);
+
+    fn overwrite(&mut self, source: &U64sStruct);
 
     fn get(&self, pos: usize) -> bool;
 
@@ -90,6 +94,10 @@ impl U64s for U64sStruct {
         Self { u64s }
     }
 
+    fn overwrite(&mut self, source: &U64sStruct) {
+        self.u64s.clone_from_slice(&source.u64s);
+    }
+
     fn get_u64(&self, p: usize) -> u64 {
         self.u64s[p]
     }
@@ -98,89 +106,77 @@ impl U64s for U64sStruct {
         self.u64s.len()
     }
 
-    fn cross_bits(
-        &mut self,
-        that: &mut U64sStruct,
-        from: usize,
-        amount: usize,
-        bidirectional: bool,
-    ) {
+    fn cross_bits(&mut self, that: &U64sStruct, from: usize, amount: usize) {
         if amount > 0 {
-            let size = self.u64s.len() * 64;
-            let n_from = if from > size { size } else { from };
-            let n_bits_amount = if size - n_from < amount {
-                size - n_from
-            } else {
-                amount
-            };
-            let first_bits_amount = if (64 - n_from % 64) >= n_bits_amount {
-                n_bits_amount
-            } else {
-                64 - n_from % 64
-            };
-
-            let after_last_bit = n_from + n_bits_amount;
-
-            let p_byte_from = n_from / 64;
-
-            let shift_from = n_from % 64;
-
-            let shift_to = after_last_bit % 64;
-
-            let full_bytes_from = if shift_from > 0 {
-                p_byte_from + 1
-            } else {
-                p_byte_from
-            };
-
-            let p_byte_to = (after_last_bit - 1) / 64;
-
-            let full_bytes_to = if shift_to != 0 {
-                p_byte_to
-            } else {
-                p_byte_to + 1
-            };
-
-            let full_bytes_present =
-                (n_bits_amount + shift_from) / 64 > 0 || shift_from == 0 && n_bits_amount / 64 > 0;
-
-            let from_present = if full_bytes_present && n_from % 64 == 0 {
-                false
-            } else {
-                shift_to > 0 || n_from % 64 > 0
-            };
-
-            let to_present = after_last_bit / 64 > 0 && shift_to > 0 && p_byte_from != p_byte_to;
+            let CopyParams {
+                first_bits_amount,
+                p_byte_from,
+                shift_from,
+                shift_to,
+                full_bytes_from,
+                p_byte_to,
+                full_bytes_to,
+                full_bytes_present,
+                from_present,
+                to_present,
+            } = self.calc_copy_params(from, amount);
 
             if from_present {
                 cross_first_u64(
+                    &mut self.u64s,
+                    &that.u64s,
+                    shift_from,
+                    p_byte_from,
+                    first_bits_amount,
+                );
+            };
+
+            if full_bytes_present {
+                cross_middle_u64s(&mut self.u64s, &that.u64s, full_bytes_from, full_bytes_to);
+            };
+
+            if to_present {
+                cross_last_u64(&mut self.u64s, &that.u64s, p_byte_to, shift_to);
+            };
+        }
+    }
+
+    fn cross_bits_bidirectional(&mut self, that: &mut U64sStruct, from: usize, amount: usize) {
+        if amount > 0 {
+            let CopyParams {
+                first_bits_amount,
+                p_byte_from,
+                shift_from,
+                shift_to,
+                full_bytes_from,
+                p_byte_to,
+                full_bytes_to,
+                full_bytes_present,
+                from_present,
+                to_present,
+            } = self.calc_copy_params(from, amount);
+
+            if from_present {
+                cross_first_u64_bidirectional(
                     &mut self.u64s,
                     &mut that.u64s,
                     shift_from,
                     p_byte_from,
                     first_bits_amount,
-                    bidirectional,
-                )
+                );
             };
 
             if full_bytes_present {
-                cross_middle_u64s(
+                cross_middle_u64s_bidirectional(
                     &mut self.u64s,
                     &mut that.u64s,
                     full_bytes_from,
                     full_bytes_to,
-                    bidirectional,
-                )
+                );
             };
 
             if to_present {
-                cross_last_u64(
-                    &mut self.u64s,
-                    &mut that.u64s,
-                    p_byte_to,
-                    shift_to,
-                    bidirectional,
-                )
+                cross_last_u64_bidirectional(&mut self.u64s, &mut that.u64s, p_byte_to, shift_to);
             };
         }
     }
@@ -207,59 +203,94 @@ fn u64_mask(p: usize) -> u64 {
     1u64 << (p % 64)
 }
 
-fn cross_middle_u64s(
+fn cross_middle_u64s(array_to: &mut Vec<u64>, array_from: &[u64], from: usize, to: usize) {
+    let mut pos = from;
+    while pos < to {
+        let tmp = array_from[pos];
+        array_to[pos] = tmp;
+        pos += 1;
+    }
+}
+
+fn cross_middle_u64s_bidirectional(
     array_to: &mut Vec<u64>,
     array_from: &mut Vec<u64>,
     from: usize,
     to: usize,
-    bidirectional: bool,
 ) {
     let mut pos = from;
     while pos < to {
-        let tmp = array_from[pos];
-        if bidirectional {
-            array_from[pos] = array_to[pos]
-        };
-        array_to[pos] = tmp;
+        std::mem::swap(&mut array_from[pos], &mut array_to[pos]);
         pos += 1;
     }
 }
 
 fn cross_first_u64(
     array_to: &mut Vec<u64>,
+    array_from: &[u64],
+    from_bit: usize,
+    pos: usize,
+    bits_amount: usize,
+) -> CrossParams {
+    let mask = (!0u64 >> (64 - bits_amount)) << from_bit;
+    let int_from = array_from[pos];
+    let int_to = array_to[pos];
+    let masked_from = int_from & mask;
+    array_to[pos] = int_to & !mask | masked_from;
+    CrossParams {
+        mask,
+        int_from,
+        int_to,
+    }
+}
+
+fn cross_first_u64_bidirectional(
+    array_to: &mut Vec<u64>,
     array_from: &mut Vec<u64>,
     from_bit: usize,
     pos: usize,
     bits_amount: usize,
-    bidirectional: bool,
 ) {
-    let mask = (!0u64 >> (64 - bits_amount)) << from_bit;
-    let int_from = array_from[pos];
-    let int_to = array_to[pos];
+    let CrossParams {
+        mask,
+        int_from,
+        int_to,
+    } = cross_first_u64(array_to, array_from, from_bit, pos, bits_amount);
     let masked_to = int_to & mask;
-    let masked_from = int_from & mask;
-    array_to[pos] = int_to & !mask | masked_from;
-    if bidirectional {
-        array_from[pos] = int_from & !mask | masked_to
-    }
+    array_from[pos] = int_from & !mask | masked_to;
 }
 
 fn cross_last_u64(
     array_to: &mut Vec<u64>,
-    array_from: &mut Vec<u64>,
+    array_from: &[u64],
     pos: usize,
     bits_amount: usize,
-    bidirectional: bool,
-) {
+) -> CrossParams {
     let mask = !0u64 >> (64 - bits_amount);
     let int_from = array_from[pos];
     let int_to = array_to[pos];
     let last_masked_from = int_from & mask;
-    let last_masked_to = int_to & mask;
     array_to[pos] = int_to & !mask | last_masked_from;
-    if bidirectional {
-        array_from[pos] = int_from & !mask | last_masked_to
+    CrossParams {
+        mask,
+        int_from,
+        int_to,
     }
+}
+
+fn cross_last_u64_bidirectional(
+    array_to: &mut Vec<u64>,
+    array_from: &mut Vec<u64>,
+    pos: usize,
+    bits_amount: usize,
+) {
+    let CrossParams {
+        mask,
+        int_from,
+        int_to,
+    } = cross_last_u64(array_to, array_from, pos, bits_amount);
+    let last_masked_to = int_to & mask;
+    array_from[pos] = int_from & !mask | last_masked_to;
 }
 
 trait Grouped
@@ -319,7 +350,7 @@ mod tests {
     use crate::gene::Gene;
 
     use super::*;
-    use quickcheck::quickcheck;
+    use quickcheck::{Gen, quickcheck};
     use std::iter;
     use std::str::FromStr;
 
@@ -349,7 +380,7 @@ mod tests {
     }
 
     impl quickcheck::Arbitrary for Gene {
-        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        fn arbitrary(g: &mut Gen) -> Self {
             g.choose::<Gene>(&[Gene::D0, Gene::D1, Gene::R0, Gene::R1])
                 .unwrap()
                 .clone()
@@ -390,23 +421,25 @@ mod tests {
     }
 
     quickcheck! {
-    fn from_str_to_str_should_return_original_str(gens: Vec<Gene>) -> bool {
-        let mut source: String = gens.iter()
-            .map(|g| match g {
-                &Gene::D1 | &Gene::D0 => '1',
-                _ => '0',
-            })
-            .collect();
-        source = if source.len() == 0 {
-            "0".to_string()
-        } else {
-            source
-        };
-        let ls = U64sStruct::from_str(&source).unwrap();
-        let result = format!("{}", ls);
-        let fmt_source = format!("{:0>1$}", source, result.len());
-        fmt_source == result
-    }}
+        fn from_str_to_str_should_return_original_str(gens: Vec<Gene>) -> bool {
+            let mut source: String = gens
+                .iter()
+                .map(|g| match g {
+                    &Gene::D1 | &Gene::D0 => '1',
+                    _ => '0',
+                })
+                .collect();
+            source = if source.len() == 0 {
+                "0".to_string()
+            } else {
+                source
+            };
+            let ls = U64sStruct::from_str(&source).unwrap();
+            let result = format!("{}", ls);
+            let fmt_source = format!("{:0>1$}", source, result.len());
+            fmt_source == result
+        }
+    }
 
     #[test]
     fn test2() {
@@ -437,7 +470,7 @@ mod tests {
         let mut line_from = from_str.parse::<U64sStruct>().unwrap();
         let to_str: String = to.into_iter().collect();
         let mut line_to = to_str.parse::<U64sStruct>().unwrap();
-        line_to.cross_bits(&mut line_from, start_bit, bits_amount, true);
+        line_to.cross_bits_bidirectional(&mut line_from, start_bit, bits_amount);
         let result_str_to = format!("{}", line_to);
         let result_str_from = format!("{}", line_from);
         let from_str2: String = crossed_str_from.into_iter().collect();
@@ -445,49 +478,122 @@ mod tests {
         assert!(result_str_to == to_str2 && result_str_from == from_str2)
     }
 
-    quickcheck! {    fn test(
-        genes_from: Vec<u64>,
-        genes_to: Vec<u64>,
-        start_bit: usize,
-        bits_amount: usize
-    ) -> bool {
-        //        env::set_var("QUICKCHECK_MAX_TESTS", "1000000");
-        //        env::set_var("QUICKCHECK_TESTS", "1000000");
-        //        env::set_var("QUICKCHECK_GENERATOR_SIZE", "10000");
+    quickcheck! {
+        fn test(
+            genes_from: Vec<u64>,
+            genes_to: Vec<u64>,
+            start_bit: usize,
+            bits_amount: usize
+        ) -> bool {
+            //        env::set_var("QUICKCHECK_MAX_TESTS", "1000000");
+            //        env::set_var("QUICKCHECK_TESTS", "1000000");
+            //        env::set_var("QUICKCHECK_GENERATOR_SIZE", "10000");
 
-        if genes_from.len() > 0 && bits_amount > 0 && genes_from.len() == genes_to.len() {
-            let from: Vec<char> = to_str(genes_from).chars().collect();
-            let to: Vec<char> = to_str(genes_to).chars().collect();
+            if genes_from.len() > 0 && bits_amount > 0 && genes_from.len() == genes_to.len() {
+                let from: Vec<char> = to_str(genes_from).chars().collect();
+                let to: Vec<char> = to_str(genes_to).chars().collect();
 
-            let from_rev = from.iter().rev().map(|c| c.clone()).collect();
-            let to_rev = to.iter().rev().map(|c| c.clone()).collect();
+                let from_rev = from.iter().rev().map(|c| c.clone()).collect();
+                let to_rev = to.iter().rev().map(|c| c.clone()).collect();
 
-            let crossed_str_to: Vec<char> = group_by_u64_and_byte_pos(
-                &cross(&to_rev, &from_rev, start_bit, bits_amount),
-            ).into_iter()
-                .filter(|c| !c.is_whitespace())
-                .rev()
-                .map(|c| c.clone())
-                .collect();
-            let crossed_str_from: Vec<char> = group_by_u64_and_byte_pos(
-                &cross(&from_rev, &to_rev, start_bit, bits_amount),
-            ).into_iter()
-                .filter(|c| !c.is_whitespace())
-                .rev()
-                .map(|c| c.clone())
-                .collect();
-            let from_str: String = from.into_iter().collect();
-            let mut line_from = from_str.parse::<U64sStruct>().unwrap();
-            let to_str: String = to.into_iter().collect();
-            let mut line_to = to_str.parse::<U64sStruct>().unwrap();
-            line_to.cross_bits(&mut line_from, start_bit, bits_amount, true);
-            let result_str_to = format!("{}", line_to);
-            let result_str_from = format!("{}", line_from);
-            let from_str2: String = crossed_str_from.into_iter().collect();
-            let to_str2: String = crossed_str_to.into_iter().collect();
-            result_str_to == to_str2 && result_str_from == from_str2
-        } else {
-            true
+                let crossed_str_to: Vec<char> =
+                    group_by_u64_and_byte_pos(&cross(&to_rev, &from_rev, start_bit, bits_amount))
+                        .into_iter()
+                        .filter(|c| !c.is_whitespace())
+                        .rev()
+                        .map(|c| c.clone())
+                        .collect();
+                let crossed_str_from: Vec<char> =
+                    group_by_u64_and_byte_pos(&cross(&from_rev, &to_rev, start_bit, bits_amount))
+                        .into_iter()
+                        .filter(|c| !c.is_whitespace())
+                        .rev()
+                        .map(|c| c.clone())
+                        .collect();
+                let from_str: String = from.into_iter().collect();
+                let mut line_from = from_str.parse::<U64sStruct>().unwrap();
+                let to_str: String = to.into_iter().collect();
+                let mut line_to = to_str.parse::<U64sStruct>().unwrap();
+                line_to.cross_bits_bidirectional(&mut line_from, start_bit, bits_amount);
+                let result_str_to = format!("{}", line_to);
+                let result_str_from = format!("{}", line_from);
+                let from_str2: String = crossed_str_from.into_iter().collect();
+                let to_str2: String = crossed_str_to.into_iter().collect();
+                result_str_to == to_str2 && result_str_from == from_str2
+            } else {
+                true
+            }
         }
-    }}
+    }
+}
+
+struct CopyParams {
+    first_bits_amount: usize,
+    p_byte_from: usize,
+    shift_from: usize,
+    shift_to: usize,
+    full_bytes_from: usize,
+    p_byte_to: usize,
+    full_bytes_to: usize,
+    full_bytes_present: bool,
+    from_present: bool,
+    to_present: bool,
+}
+
+struct CrossParams {
+    mask: u64,
+    int_from: u64,
+    int_to: u64,
+}
+
+impl U64sStruct {
+    fn calc_copy_params(&self, from: usize, amount: usize) -> CopyParams {
+        let size = self.u64s.len() * 64;
+        let n_from = if from > size { size } else { from };
+        let n_bits_amount = if size - n_from < amount {
+            size - n_from
+        } else {
+            amount
+        };
+        let first_bits_amount = if (64 - n_from % 64) >= n_bits_amount {
+            n_bits_amount
+        } else {
+            64 - n_from % 64
+        };
+        let after_last_bit = n_from + n_bits_amount;
+        let p_byte_from = n_from / 64;
+        let shift_from = n_from % 64;
+        let shift_to = after_last_bit % 64;
+        let full_bytes_from = if shift_from > 0 {
+            p_byte_from + 1
+        } else {
+            p_byte_from
+        };
+        let p_byte_to = (after_last_bit - 1) / 64;
+        let full_bytes_to = if shift_to != 0 {
+            p_byte_to
+        } else {
+            p_byte_to + 1
+        };
+        let full_bytes_present =
+            (n_bits_amount + shift_from) / 64 > 0 || shift_from == 0 && n_bits_amount / 64 > 0;
+        let from_present = if full_bytes_present && n_from % 64 == 0 {
+            false
+        } else {
+            shift_to > 0 || n_from % 64 > 0
+        };
+        let to_present = after_last_bit / 64 > 0 && shift_to > 0 && p_byte_from != p_byte_to;
+        CopyParams {
+            first_bits_amount,
+            p_byte_from,
+            shift_from,
+            shift_to,
+            full_bytes_from,
+            p_byte_to,
+            full_bytes_to,
+            full_bytes_present,
+            from_present,
+            to_present,
+        }
+    }
 }
