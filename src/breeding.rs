@@ -4,9 +4,9 @@ use crate::{chromosome::Chromosome, random_utils::RandomUtils};
 
 pub trait Breeding {
     fn generate_chromosome(&self) -> Chromosome;
-    fn conception(&self, first_parent: &Chromosome, second_parent: &Chromosome) -> Chromosome;
-    fn attempt_cross_zygotes(&self, chr: Chromosome) -> Chromosome;
-    fn attempt_mutate(&self, chr: Chromosome) -> Chromosome;
+    fn conception(&self, first_parent: &mut Chromosome, second_parent: &Chromosome);
+    fn attempt_cross_zygotes(&self, chr: &mut Chromosome);
+    fn attempt_mutate(&self, chr: &mut Chromosome);
 }
 
 pub struct BreedingStruct {
@@ -25,39 +25,31 @@ impl Breeding for BreedingStruct {
         )
     }
 
-    fn conception(&self, first_parent: &Chromosome, second_parent: &Chromosome) -> Chromosome {
-        Self::attempt_cross_zygotes(
-            self,
-            Self::attempt_mutate(
-                self,
-                first_parent.cross_chromosomes(
-                    second_parent,
-                    self.random_utils.crossing_chromosome_pos(),
-                    self.random_utils.crossing_chromosome_pos(),
-                ),
-            ),
-        )
+    fn conception(&self, first_parent: &mut Chromosome, second_parent: &Chromosome) {
+        first_parent.cross_chromosomes(
+            second_parent,
+            self.random_utils.crossing_chromosome_pos(),
+            self.random_utils.crossing_chromosome_pos(),
+        );
+        self.attempt_mutate(first_parent);
+        self.attempt_cross_zygotes(first_parent);
     }
 
-    fn attempt_cross_zygotes(&self, mut chr: Chromosome) -> Chromosome {
+    fn attempt_cross_zygotes(&self, chr: &mut Chromosome) {
         if self.random_utils.should_cross_zygotes() {
             chr.cross_zygotes(
                 self.random_utils.crossing_zygote_pos(),
                 self.random_utils.crossing_zygote_pos() + 1,
             )
-        } else {
-            chr
         }
     }
 
-    fn attempt_mutate(&self, chr: Chromosome) -> Chromosome {
+    fn attempt_mutate(&self, chr: &mut Chromosome) {
         if self.random_utils.should_mutate() {
             chr.mutate(
                 self.random_utils.mutation_pos(),
                 &self.random_utils.rand_gen(),
-            )
-        } else {
-            chr
-        }
+            );
+        };
     }
 }

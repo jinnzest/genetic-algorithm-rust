@@ -28,6 +28,11 @@ impl Chromosome {
         }
     }
 
+    pub fn overwrite(&mut self, source: &Chromosome) {
+        self.dominant.overwrite(&source.dominant);
+        self.recessive.overwrite(&source.recessive);
+    }
+
     pub fn decode_genotype(&self) -> Vec<u64> {
         let mut p = 0;
         let mut decoded = Vec::with_capacity(self.dominant.u64s_amount());
@@ -41,30 +46,16 @@ impl Chromosome {
         }
         decoded
     }
-    pub fn cross_zygotes(&mut self, begin: usize, amount: usize) -> Chromosome {
+    pub fn cross_zygotes(&mut self, begin: usize, amount: usize) {
         self.dominant
-            .cross(&mut self.recessive, begin, amount, true);
-        self.clone()
+            .cross_bidirectional(&mut self.recessive, begin, amount);
     }
-    pub fn cross_chromosomes(&self, that: &Chromosome, begin: usize, amount: usize) -> Chromosome {
-        let mut new_chr = Chromosome {
-            dominant: self.dominant.clone(),
-            recessive: self.recessive.clone(),
-        };
-
-        new_chr
-            .dominant
-            .cross(&mut that.dominant.clone(), begin, amount, false);
-        new_chr
-            .recessive
-            .cross(&mut that.recessive.clone(), begin, amount, false);
-        new_chr
+    pub fn cross_chromosomes(&mut self, that: &Chromosome, begin: usize, amount: usize) {
+        self.dominant.cross(&that.dominant, begin, amount);
+        self.recessive.cross(&that.recessive, begin, amount);
     }
-    pub fn mutate(&self, pos: usize, new_gene: &Gene) -> Chromosome {
-        Chromosome {
-            dominant: self.dominant.mutate(pos, new_gene),
-            recessive: self.recessive.clone(),
-        }
+    pub fn mutate(&mut self, pos: usize, new_generation: &Gene) {
+        self.dominant.mutate(pos, new_generation);
     }
 }
 
@@ -137,8 +128,9 @@ mod tests {
                 "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
                 "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
             );
+            chr.cross_zygotes(2, 3);
             assert_eq!(
-            chr.cross_zygotes(2, 3).to_string(),
+            chr.to_string(),
             from_strings(
                 "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddr rrdd",
                 "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrd ddrr",
@@ -153,14 +145,15 @@ mod tests {
                 "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
                 "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
             );
-            chr.cross_zygotes(3, pos.saturating_add(61)).to_string() ==
+            chr.cross_zygotes(3, pos.saturating_add(61));
+            chr.to_string() ==
                 "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rddd\
                 \ndddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd drrr"
         }}
 
         #[test]
         fn cross_chromosomes() {
-            let first = from_strings(
+            let mut first = from_strings(
                 "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
                 "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
             );
@@ -168,8 +161,9 @@ mod tests {
                 "DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD",
                 "RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR RRRR",
             );
+            first.cross_chromosomes(&second, 1, 2);
             assert_eq!(
-                first.cross_chromosomes(&second, 1, 2).to_string(),
+                first.to_string(),
                 "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dDDd\
             \nrrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rRRr"
             )
@@ -177,12 +171,13 @@ mod tests {
 
         #[test]
         fn mutate_gene_in_dominant() {
-            let chr = from_strings(
+            let mut chr = from_strings(
                 "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd",
                 "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
             );
+            chr.mutate(2, &Gene::R1);
             assert_eq!(
-                chr.mutate(2, &Gene::R1).to_string(),
+                chr.to_string(),
                 "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dRdd\
             \nrrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr"
             )

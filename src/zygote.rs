@@ -70,6 +70,11 @@ impl Zygote {
         Self { dominance, values }
     }
 
+    pub fn overwrite(&mut self, source: &Zygote) {
+        self.dominance.overwrite(&source.dominance);
+        self.values.overwrite(&source.values);
+    }
+
     pub fn get_d_u64(&self, p: usize) -> u64 {
         self.dominance.get_u64(p)
     }
@@ -82,12 +87,8 @@ impl Zygote {
         self.dominance.u64s_amount()
     }
 
-    pub fn mutate(&self, pos: usize, new_gen: &Gene) -> Zygote {
-        let dominance = self.dominance.clone();
-        let values = self.values.clone();
-        let mut zgt = Zygote { dominance, values };
-        zgt.set(pos, new_gen);
-        zgt
+    pub fn mutate(&mut self, pos: usize, new_generation: &Gene) {
+        self.set(pos, new_generation);
     }
 
     fn set(&mut self, pos: usize, gene: &Gene) {
@@ -111,11 +112,16 @@ impl Zygote {
         }
     }
 
-    pub fn cross(&mut self, that: &mut Zygote, begin: usize, amount: usize, bidirectional: bool) {
+    pub fn cross_bidirectional(&mut self, that: &mut Zygote, begin: usize, amount: usize) {
         self.dominance
-            .cross_bits(&mut that.dominance, begin, amount, bidirectional);
+            .cross_bits_bidirectional(&mut that.dominance, begin, amount);
         self.values
-            .cross_bits(&mut that.values, begin, amount, bidirectional);
+            .cross_bits_bidirectional(&mut that.values, begin, amount);
+    }
+
+    pub fn cross(&mut self, that: &Zygote, begin: usize, amount: usize) {
+        self.dominance.cross_bits(&that.dominance, begin, amount);
+        self.values.cross_bits(&that.values, begin, amount);
     }
 }
 
@@ -159,16 +165,15 @@ mod tests {
     fn not_modify_genes_outside_defined_pos() {
         let n_pos = 0;
         let genes_str = &format!("{}", VecGen::new(vec![Gene::D0, Gene::D1]));
-        let zgt = Zygote::from_str(genes_str).unwrap();
+        let mut zgt = Zygote::from_str(genes_str).unwrap();
         println!("genes_str={}", genes_str);
         println!("before mut={}", zgt);
-        let mutated_zgt = zgt.mutate(n_pos, &Gene::D1);
-        let mutated_zgt_str: String = format!("{}", mutated_zgt)
+        zgt.mutate(n_pos, &Gene::D1);
+        let mutated_zgt_str: String = format!("{}", zgt)
             .chars()
             .filter(|c| !c.is_whitespace())
             .collect();
         let mut mutated_zgt_chars = mutated_zgt_str.chars().rev();
-        println!("{}", mutated_zgt);
         let genes_iter = genes_str.chars().rev();
         let (res, _) = genes_iter.fold((true, 0), |(acc, p), g| {
             let tst_gen = mutated_zgt_chars.next().unwrap();
@@ -179,7 +184,7 @@ mod tests {
     }
 
     quickcheck! {
-        fn to_and_from_str_genes(genes: Vec<Gene>) -> bool {
+    fn to_and_from_str_genes(genes: Vec<Gene>) -> bool {
         if genes.is_empty() {
             true
         } else {
@@ -191,18 +196,19 @@ mod tests {
             println!("from: {}\nto  : {}", aligned_genes, filtered_back);
             aligned_genes == filtered_back
         }
-    }}
+    }
+    }
 
     quickcheck! {
-    fn not_modify_genes_outside_defined_pos2(genes: Vec<Gene>, pos: usize, new_gen: Gene) -> bool {
+    fn not_modify_genes_outside_defined_pos2(genes: Vec<Gene>, pos: usize, new_generation: Gene) -> bool {
         if genes.is_empty() {
             true
         } else {
             let n_pos = pos % genes.len();
             let genes_str = &format!("{}", VecGen::new(genes));
-            let zgt = Zygote::from_str(genes_str).unwrap();
-            let mutated_zgt = zgt.mutate(n_pos, &new_gen);
-            let mutated_zgt_str: String = format!("{}", mutated_zgt)
+            let mut zgt = Zygote::from_str(genes_str).unwrap();
+            zgt.mutate(n_pos, &new_generation);
+            let mutated_zgt_str: String = format!("{}", zgt)
                 .chars()
                 .filter(|c| !c.is_whitespace())
                 .collect();
@@ -215,7 +221,7 @@ mod tests {
                     .iter()
                     .collect::<String>()
             );
-            println!("mutated_zgt={}", mutated_zgt);
+            println!("mutated_zgt={}", zgt);
             let genes_iter = genes_str.chars().rev();
             let (res, _) = genes_iter.fold((true, 0), |(acc, p), g| {
                 let tst_gen = mutated_zgt_chars.next().unwrap();
@@ -239,49 +245,50 @@ mod tests {
     }}
 
     quickcheck! {
-    fn modify_gene_defined_by_pos(genes: Vec<Gene>, pos: usize, new_gen: Gene) -> bool {
-        if genes.is_empty() {
-            true
-        } else {
-            let n_pos = pos % genes.len();
-            let genes_str = &format!("{}", VecGen::new(genes));
-            let zgt = Zygote::from_str(genes_str).unwrap();
-            let mutated_zgt = zgt.mutate(n_pos, &new_gen);
-            let mutated_zgt_str: String = format!("{}", mutated_zgt)
-                .chars()
-                .filter(|c| !c.is_whitespace())
-                .collect();
-            let mut mutated_zgt_chars = mutated_zgt_str.chars().rev();
-            let normilazed = format!("{:r>1$}", genes_str, mutated_zgt_str.len());
-            let chars: Vec<char> = normilazed.chars().collect();
-            println!(
-                "genes_str  ={}",
-                u64s::group_by_u64_and_byte_pos(&chars)
-                    .iter()
-                    .collect::<String>()
-            );
-            println!("mutated_zgt={}", mutated_zgt);
-            let genes_iter = genes_str.chars().rev();
-            let (res, _) = genes_iter.fold((true, 0), |(acc, p), g| {
-                let tst_gen = mutated_zgt_chars.next().unwrap();
-                (
-                    acc &&
-                        if p == n_pos {
-                            if tst_gen == Gene::to_char(&new_gen) {
-                                true
+        fn modify_gene_defined_by_pos(genes: Vec<Gene>, pos: usize, new_generation: Gene) -> bool {
+            if genes.is_empty() {
+                true
+            } else {
+                let n_pos = pos % genes.len();
+                let genes_str = &format!("{}", VecGen::new(genes));
+                let mut zgt = Zygote::from_str(genes_str).unwrap();
+                zgt.mutate(n_pos, &new_generation);
+                let mutated_zgt_str: String = format!("{}", zgt)
+                    .chars()
+                    .filter(|c| !c.is_whitespace())
+                    .collect();
+                let mut mutated_zgt_chars = mutated_zgt_str.chars().rev();
+                let normilazed = format!("{:r>1$}", genes_str, mutated_zgt_str.len());
+                let chars: Vec<char> = normilazed.chars().collect();
+                println!(
+                    "genes_str  ={}",
+                    u64s::group_by_u64_and_byte_pos(&chars)
+                        .iter()
+                        .collect::<String>()
+                );
+                println!("mutated_zgt={}", zgt);
+                let genes_iter = genes_str.chars().rev();
+                let (res, _) = genes_iter.fold((true, 0), |(acc, p), g| {
+                    let tst_gen = mutated_zgt_chars.next().unwrap();
+                    (
+                        acc &&
+                            if p == n_pos {
+                                if tst_gen == Gene::to_char(&new_generation) {
+                                    true
+                                } else {
+                                    println!("{}!={}", g, tst_gen);
+                                    false
+                                }
                             } else {
-                                println!("{}!={}", g, tst_gen);
-                                false
-                            }
-                        } else {
-                            true
-                        },
-                    p + 1,
-                )
-            });
-            res
+                                true
+                            },
+                        p + 1,
+                    )
+                });
+                res
+            }
         }
-    }}
+    }
 
     #[test]
     fn cross_parts() {
@@ -293,7 +300,7 @@ mod tests {
             "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
         )
         .unwrap();
-        zgt1.cross(&mut zgt2, 3, 4, true);
+        zgt1.cross(&mut zgt2, 3, 4);
         assert_eq!(
             zgt1.to_string(),
             "dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd dddd drrr rddd"
@@ -310,7 +317,7 @@ mod tests {
             "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr",
         )
         .unwrap();
-        zgt1.cross(&mut zgt2, 3, 100, true);
+        zgt1.cross(&mut zgt2, 3, 100);
         assert_eq!(
             zgt1.to_string(),
             "rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rrrr rddd"
