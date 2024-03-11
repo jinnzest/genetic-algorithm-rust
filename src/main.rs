@@ -13,6 +13,7 @@ pub mod global_constants;
 pub mod incubator;
 pub mod individual;
 pub mod random_utils;
+pub mod u64s;
 pub mod utils;
 pub mod zygote;
 
@@ -21,10 +22,10 @@ use global_constants::*;
 use random_utils::*;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use utils::*;
 
 use crate::breeding::make_breeding;
 use crate::incubator::Incubator;
+use crate::utils::decode_bits_to_u64s;
 
 impl RandomParams for RandomParamsStruct {
     fn chromosome_genes_amount(&self) -> usize {
@@ -33,8 +34,8 @@ impl RandomParams for RandomParamsStruct {
 }
 
 impl FitnessCalculator for FitnessCalculatorStruct {
-    fn calc_fitness(&self, decoded_genotype: &[bool]) -> f64 {
-        let u64s = decode_bools_to_u64s(decoded_genotype);
+    fn calc_fitness(&self, decoded_genotype: &[u64]) -> f64 {
+        let u64s = decode_bits_to_u64s(decoded_genotype);
         let bits = u64s.iter().fold(0u64, |acc, v| acc | v);
         if bits == 0 { 0f64 } else { 1f64 }
     }

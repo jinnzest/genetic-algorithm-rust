@@ -1,7 +1,8 @@
-use rand;
 use std::rc::Rc;
 
-use crate::{gene::Gene, zygote::Zygote};
+use rand;
+
+use crate::{gene::Gene, u64s::U64s, zygote::Zygote};
 
 pub trait RandomUtils {
     fn mutation_pos(&self) -> usize;
@@ -60,10 +61,12 @@ impl RandomUtils for RandomUtilsStruct {
     }
 
     fn generate_zygote(&self) -> Zygote {
-        let genes: Vec<Gene> = (0..self.random_params.chromosome_genes_amount())
-            .map(|_| rand::random::<Gene>())
-            .collect();
-        Zygote::new(genes)
+        let len = self.random_params.chromosome_genes_amount() / 64;
+        let d = (0..len).map(|_| rand::random::<u64>()).collect();
+        let v = (0..len).map(|_| rand::random::<u64>()).collect();
+        let dominance = U64s::new(d);
+        let values = U64s::new(v);
+        Zygote::new(dominance, values)
     }
 }
 

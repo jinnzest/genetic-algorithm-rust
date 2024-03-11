@@ -175,11 +175,12 @@ impl RandomUtils for RandomUtilsMock {
 pub struct FitnessCalculatorMock;
 
 impl FitnessCalculator for FitnessCalculatorMock {
-    fn calc_fitness(&self, decoded_genotype: &[bool]) -> f64 {
+    fn calc_fitness(&self, decoded_genotype: &[u64]) -> f64 {
         let sum = decoded_genotype
             .iter()
-            .fold(0u64, |acc, &bit| if bit { acc + 1 } else { acc });
-        unsafe { sum as f64 * SIGN }
+            .map(|l| l.count_ones() as f64)
+            .fold(0.0, |acc, d| acc + d);
+        unsafe { sum * SIGN }
     }
 }
 
