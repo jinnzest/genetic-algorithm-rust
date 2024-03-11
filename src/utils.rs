@@ -9,12 +9,12 @@ pub fn normalize_fitness(fitness: f64, min_fitness: f64, max_fitness: f64) -> f6
 }
 
 pub fn gray2bin(n: &u64) -> u64 {
-    let mut r = *n;
-    let mut mask = r >> 1;
-    while mask != 0 {
-        r = r ^ mask;
-        mask = mask >> 1;
-    }
+    let mut r = (n >> 32) ^ n;
+    r ^= r >> 16;
+    r ^= r >> 8;
+    r ^= r >> 4;
+    r ^= r >> 2;
+    r ^= r >> 1;
     r
 }
 
