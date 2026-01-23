@@ -1,33 +1,7 @@
-use std::collections::HashMap;
 use std::fmt;
-use std::sync::LazyLock;
 
 use crate::gene::Gene;
 use crate::zygote::Zygote;
-
-static DECODING_RULES: LazyLock<HashMap<(Gene, Gene), bool>> = LazyLock::new(|| {
-    let mut hm = HashMap::new();
-    hm.insert((Gene::D1, Gene::D0), true);
-    hm.insert((Gene::D1, Gene::D1), true);
-    hm.insert((Gene::D1, Gene::R1), true);
-    hm.insert((Gene::D1, Gene::R0), true);
-
-    hm.insert((Gene::D0, Gene::D0), false);
-    hm.insert((Gene::D0, Gene::D1), false);
-    hm.insert((Gene::D0, Gene::R1), false);
-    hm.insert((Gene::D0, Gene::R0), false);
-
-    hm.insert((Gene::R1, Gene::D0), false);
-    hm.insert((Gene::R1, Gene::D1), true);
-    hm.insert((Gene::R1, Gene::R1), true);
-    hm.insert((Gene::R1, Gene::R0), true);
-
-    hm.insert((Gene::R0, Gene::D0), false);
-    hm.insert((Gene::R0, Gene::D1), true);
-    hm.insert((Gene::R0, Gene::R1), false);
-    hm.insert((Gene::R0, Gene::R0), false);
-    hm
-});
 
 #[derive(Clone)]
 pub struct Chromosome {
@@ -54,17 +28,36 @@ impl Chromosome {
             recessive,
         }
     }
+
+    fn decode(genes: &(Gene, Gene)) -> bool {
+        match *genes {
+            (Gene::D1, Gene::D0)
+            | (Gene::D1, Gene::D1)
+            | (Gene::D1, Gene::R1)
+            | (Gene::D1, Gene::R0)
+            | (Gene::R1, Gene::D1)
+            | (Gene::R1, Gene::R1)
+            | (Gene::R1, Gene::R0)
+            | (Gene::R0, Gene::D1) => true,
+
+            (Gene::D0, Gene::D0)
+            | (Gene::D0, Gene::D1)
+            | (Gene::D0, Gene::R1)
+            | (Gene::D0, Gene::R0)
+            | (Gene::R1, Gene::D0)
+            | (Gene::R0, Gene::D0)
+            | (Gene::R0, Gene::R1)
+            | (Gene::R0, Gene::R0) => false,
+        }
+    }
+
     pub fn decode_genotype(&self) -> Vec<bool> {
         let pairs = self
             .dominant
             .get_genes()
             .into_iter()
             .zip(self.recessive.get_genes());
-        pairs
-            .map(|(d, r)| DECODING_RULES.get(&(d, r)))
-            .map(|o| o.unwrap())
-            .cloned()
-            .collect()
+        pairs.map(|genes| Chromosome::decode(&genes)).collect()
     }
     pub fn cross_zygotes(&self, begin: usize, amount: usize) -> Chromosome {
         Chromosome {
@@ -78,9 +71,9 @@ impl Chromosome {
             recessive: self.recessive.cross(&that.recessive, begin, amount),
         }
     }
-    pub fn mutate(&self, pos: usize, new_gen: &Gene) -> Chromosome {
+    pub fn mutate(&self, pos: usize, new_gene: &Gene) -> Chromosome {
         Chromosome {
-            dominant: self.dominant.mutate(pos, new_gen),
+            dominant: self.dominant.mutate(pos, new_gene),
             recessive: self.recessive.clone(),
         }
     }
