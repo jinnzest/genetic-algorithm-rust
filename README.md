@@ -12,3 +12,4 @@ To try it yourself run: cargo build --release && target/release/genetic-algorith
 Optimization steps and measurements: 
 
 1. Without optimization it runs 100000 generations for about 6313161 ms (~ 105 minutes)
+2. Replace a hash map by a function with pattern matching, it runs for about 4929082 ms, ~ 1.28 times faster than the initial one (~ 82 minutes) 
