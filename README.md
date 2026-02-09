@@ -15,3 +15,4 @@ Optimization steps and measurements:
 2. Replace a hash map by a function with pattern matching, it runs for about 4929082 ms, ~ 1.28 times faster than the initial one (~ 82 minutes) 
 3. Replace vec of genes by vec of u64s, it runs for about 99161 ms, ~ 64 times faster than the initial one (~ 99 seconds)
 4. Optimize gray code, it runs for about 60674 ms, ~ 104 times faster than the initial one (~ 60 seconds)
+5. Add a second generation pool to incubator to use it as a cache thus reducing cloning, it runs for about 43952 ms, ~ 144 times faster than the initial one (~ 44 seconds)
