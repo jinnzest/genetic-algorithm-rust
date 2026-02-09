@@ -16,3 +16,4 @@ Optimization steps and measurements:
 3. Replace vec of genes by vec of u64s, it runs for about 99161 ms, ~ 64 times faster than the initial one (~ 99 seconds)
 4. Optimize gray code, it runs for about 60674 ms, ~ 104 times faster than the initial one (~ 60 seconds)
 5. Add a second generation pool to incubator to use it as a cache thus reducing cloning, it runs for about 43952 ms, ~ 144 times faster than the initial one (~ 44 seconds)
+6. Replace dynamic dispatching by static one, it runs for about 41833 ms, ~ 151 times faster than the initial one (~ 42 seconds)
