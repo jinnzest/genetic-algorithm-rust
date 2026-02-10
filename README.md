@@ -17,3 +17,4 @@ Optimization steps and measurements:
 4. Optimize gray code, it runs for about 60674 ms, ~ 104 times faster than the initial one (~ 60 seconds)
 5. Add a second generation pool to incubator to use it as a cache thus reducing cloning, it runs for about 43952 ms, ~ 144 times faster than the initial one (~ 44 seconds)
 6. Replace dynamic dispatching by static one, it runs for about 41833 ms, ~ 151 times faster than the initial one (~ 42 seconds)
+7. Return parent positions instead of themselfs to reduce cloning , it runs for about 18106 ms, ~ 359 times faster than the initial one (~ 18 seconds)
