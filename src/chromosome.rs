@@ -6,6 +6,7 @@ use crate::{gene::Gene, zygote::Zygote};
 pub struct Chromosome {
     dominant: Zygote,
     recessive: Zygote,
+    decoded_genotype: Vec<u64>,
 }
 
 impl fmt::Display for Chromosome {
@@ -23,6 +24,7 @@ impl fmt::Debug for Chromosome {
 impl Chromosome {
     pub fn new(dominant: Zygote, recessive: Zygote) -> Self {
         Self {
+            decoded_genotype: vec![0; dominant.u64s_amount()],
             dominant,
             recessive,
         }
@@ -33,19 +35,21 @@ impl Chromosome {
         self.recessive.overwrite(&source.recessive);
     }
 
-    pub fn decode_genotype(&self) -> Vec<u64> {
+    pub fn decode_genotype(&mut self) {
         let mut p = 0;
-        let mut decoded = Vec::with_capacity(self.dominant.u64s_amount());
         while p < self.dominant.u64s_amount() {
             let dd = self.dominant.get_d_u64(p);
             let dv = self.dominant.get_v_u64(p);
             let rd = self.recessive.get_d_u64(p);
             let rv = self.recessive.get_v_u64(p);
-            decoded.push(dv & !rd | rd & rv & !dd | dd & dv);
+            self.decoded_genotype[p] = dv & !rd | rd & rv & !dd | dd & dv;
             p += 1
         }
-        decoded
     }
+    pub fn decoded_genotype(&self) -> &[u64] {
+        &self.decoded_genotype
+    }
+
     pub fn cross_zygotes(&mut self, begin: usize, amount: usize) {
         self.dominant
             .cross_bidirectional(&mut self.recessive, begin, amount);
@@ -65,6 +69,7 @@ mod tests {
 
     fn from_strings(dominant: &str, recessive: &str) -> Chromosome {
         Chromosome {
+            decoded_genotype: vec![0; dominant.len()],
             dominant: dominant.parse::<Zygote>().unwrap(),
             recessive: recessive.parse::<Zygote>().unwrap(),
         }
@@ -89,14 +94,16 @@ mod tests {
 
         #[test]
         fn must_override_recessive_genes_of_second_one() {
-            let chr = from_strings("DDdd", "RrRr");
-            assert_eq!(chr.decode_genotype(), vec![0b1100u64]);
+            let mut chr = from_strings("DDdd", "RrRr");
+            chr.decode_genotype();
+            assert_eq!(chr.decoded_genotype(), vec![0b1100u64, 0, 0, 0]);
         }
 
         #[test]
         fn must_override_dominant_genes_of_second_one() {
-            let chr = from_strings("DDdd", "DdDd");
-            assert_eq!(chr.decode_genotype(), vec![0b1100u64]);
+            let mut chr = from_strings("DDdd", "DdDd");
+            chr.decode_genotype();
+            assert_eq!(chr.decoded_genotype(), vec![0b1100u64, 0, 0, 0]);
         }
     }
 
@@ -106,14 +113,16 @@ mod tests {
 
         #[test]
         fn must_override_recessive_genes_of_second_one() {
-            let chr = from_strings("RRrr", "RrRr");
-            assert_eq!(chr.decode_genotype(), vec![0b1100u64]);
+            let mut chr = from_strings("RRrr", "RrRr");
+            chr.decode_genotype();
+            assert_eq!(chr.decoded_genotype(), vec![0b1100u64, 0, 0, 0]);
         }
 
         #[test]
         fn must_override_dominant_genes_of_second_one() {
-            let chr = from_strings("RRrr", "DdDd");
-            assert_eq!(chr.decode_genotype(), vec![0b1010u64]);
+            let mut chr = from_strings("RRrr", "DdDd");
+            chr.decode_genotype();
+            assert_eq!(chr.decoded_genotype(), vec![0b1010u64, 0, 0, 0]);
         }
     }
 

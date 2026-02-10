@@ -62,7 +62,8 @@ impl<RU: RandomUtils, CP: ChoosingProbability, B: Breeding<RU>, FC: FitnessCalcu
             self.tmp_chromosome
                 .overwrite(&self.old_generation.individuals[pair.second].chromosome);
             B::conception(&mut new_individual.chromosome, &self.tmp_chromosome);
-            new_individual.fitness = FC::calc_fitness(&new_individual.chromosome.decode_genotype());
+            new_individual.chromosome.decode_genotype();
+            new_individual.fitness = FC::calc_fitness(new_individual.chromosome.decoded_genotype());
         }
     }
 
@@ -74,9 +75,10 @@ impl<RU: RandomUtils, CP: ChoosingProbability, B: Breeding<RU>, FC: FitnessCalcu
     }
 
     fn generate_individual() -> Individual {
-        let chromosome = B::generate_chromosome();
+        let mut chromosome = B::generate_chromosome();
+        chromosome.decode_genotype();
         Individual {
-            fitness: FC::calc_fitness(&chromosome.decode_genotype()),
+            fitness: FC::calc_fitness(chromosome.decoded_genotype()),
             chromosome,
         }
     }
