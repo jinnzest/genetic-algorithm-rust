@@ -56,8 +56,11 @@ impl<RU: RandomUtils, CP: ChoosingProbability, B: Breeding<RU>, FC: FitnessCalcu
 
         for (pos, pair) in parents.iter().enumerate() {
             let new_individual = &mut self.new_generation.individuals[pos];
-            new_individual.chromosome.overwrite(&pair.first.chromosome);
-            self.tmp_chromosome.overwrite(&pair.second.chromosome);
+            new_individual
+                .chromosome
+                .overwrite(&self.old_generation.individuals[pair.first].chromosome);
+            self.tmp_chromosome
+                .overwrite(&self.old_generation.individuals[pair.second].chromosome);
             B::conception(&mut new_individual.chromosome, &self.tmp_chromosome);
             new_individual.fitness = FC::calc_fitness(&new_individual.chromosome.decode_genotype());
         }

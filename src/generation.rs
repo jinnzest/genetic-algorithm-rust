@@ -4,8 +4,8 @@ use crate::{individual::Individual, random_utils::ChoosingProbability, utils::no
 
 #[derive(Clone)]
 pub struct Parents {
-    pub first: Individual,
-    pub second: Individual,
+    pub first: usize,
+    pub second: usize,
 }
 
 pub struct Generation<CP: ChoosingProbability> {
@@ -31,12 +31,9 @@ impl<CP: ChoosingProbability> Generation<CP> {
         let mut parents = Vec::new();
         let mut pos = 0;
         while parents.len() < self.individuals.len() {
-            let first_parent_pos = self.find_parent_pos(&mut pos, None);
-            let second_parent_pos = self.find_parent_pos(&mut pos, Some(first_parent_pos));
-            parents.push(Parents {
-                first: self.individuals[first_parent_pos].clone(),
-                second: self.individuals[second_parent_pos].clone(),
-            });
+            let first = self.find_parent_pos(&mut pos, None);
+            let second = self.find_parent_pos(&mut pos, Some(first));
+            parents.push(Parents { first, second });
         }
         parents
     }
