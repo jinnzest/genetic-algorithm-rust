@@ -28,7 +28,7 @@ impl<CP: ChoosingProbability> Generation<CP> {
     }
 
     pub fn select_parent_pairs(&self) -> Vec<Parents> {
-        let mut parents = Vec::new();
+        let mut parents = Vec::with_capacity(self.individuals.len());
         let mut pos = 0;
         while parents.len() < self.individuals.len() {
             let first = self.find_parent_pos(&mut pos, None);
