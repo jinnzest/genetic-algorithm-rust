@@ -19,3 +19,4 @@ Optimization steps and measurements:
 6. Replace dynamic dispatching by static one, it runs for about 41833 ms, ~ 151 times faster than the initial one (~ 42 seconds)
 7. Return parent positions instead of themselfs to reduce cloning , it runs for about 18106 ms, ~ 359 times faster than the initial one (~ 18 seconds)
 8. Store decoded genotype in chromosome to remove allocating of vec<u64> for each chromosome in each generation, it runs for about 15468 ms, ~ 408 times faster than the initial one (~ 15 seconds)  
+9. Add with_capacity to Vec of Parents in Generation, it runs for about 15041 ms, ~ 420 times faster than the initial one (~ 15 seconds)  
